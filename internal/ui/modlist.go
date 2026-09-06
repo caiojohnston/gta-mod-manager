@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/caiojohnston/gta-mod-manager/internal/config"
+	"github.com/caiojohnston/gta-mod-manager/internal/installer"
 	"github.com/caiojohnston/gta-mod-manager/internal/model"
 )
 
@@ -108,14 +109,32 @@ func (a *App) Build() fyne.CanvasObject {
 	disableAllBtn := widget.NewButton("Disable all", a.disableAll)
 	a.cleanBtn = widget.NewButton("Launch Clean", a.launchClean)
 
-	a.needGameDirButtons = []*widget.Button{installBtn, rescanBtn, profilesBtn, enableAllBtn, disableAllBtn}
+	shvBtn := widget.NewButton("Install ScriptHookV", func() {
+		a.ShowInstallBaseTool(installer.ScriptHookVPreset(), a.Cfg.Downloads.ScriptHookVURL)
+	})
+	openRPFBtn := widget.NewButton("Install OpenRPF", func() {
+		a.ShowInstallBaseTool(installer.OpenRPFPreset(), a.Cfg.Downloads.OpenRPFURL)
+	})
+	runBtn := widget.NewButtonWithIcon("Run GTA", theme.MediaPlayIcon(), a.runGTA)
+	runBtn.Importance = widget.HighImportance
+
+	a.needGameDirButtons = []*widget.Button{
+		installBtn, rescanBtn, profilesBtn, enableAllBtn, disableAllBtn,
+		shvBtn, openRPFBtn, runBtn,
+	}
 
 	topRow := container.NewHBox(detectBtn, setDirBtn, installBtn, rescanBtn, profilesBtn)
+	baseRow := container.NewHBox(
+		widget.NewLabelWithStyle("Base:", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
+		shvBtn, openRPFBtn,
+		widget.NewSeparator(),
+		runBtn,
+	)
 	bulkRow := container.NewHBox(
 		widget.NewLabelWithStyle("Bulk:", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
 		enableAllBtn, disableAllBtn, a.cleanBtn,
 	)
-	toolbar := container.NewVBox(topRow, bulkRow, widget.NewSeparator())
+	toolbar := container.NewVBox(topRow, baseRow, bulkRow, widget.NewSeparator())
 
 	// --- status bar --------------------------------------------------
 	a.statusBar = widget.NewLabel("")

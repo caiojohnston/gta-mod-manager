@@ -12,6 +12,14 @@ spec-driven — see [`docs/SPEC.md`](docs/SPEC.md) for scope and
   Steam's `libraryfolders.vdf`, Epic's manifests, and common install paths, then
   confirms each by looking for `GTA5_Enhanced.exe` (Legacy `GTA5.exe` is picked
   up too, ranked lower). Manual folder picker as a fallback.
+- **Base-tool buttons** — *Install ScriptHookV* and *Install OpenRPF* open the
+  official download page, take the `.zip` (auto-spotted in your Downloads
+  folder when possible), and fill in the correct placement for you
+  (`ScriptHookV.dll`/`dinput8.dll` in root; only `OpenIV.asi` for OpenRPF, its
+  proxy DLLs skipped so they don't clobber ScriptHookV's). Set a direct URL in
+  `config.json` → `downloads` and the button downloads it itself.
+- **Run GTA** — launches the game via `PlayGTAV.exe` (the shim that hands off to
+  Steam/Epic/Rockstar), falling back to `GTA5_Enhanced.exe`.
 - **Install from `.zip` or folder** with a review screen: every file is
   classified by the rule table, and you can untick extras or override any file's
   destination — Game root / `scripts/` / `mods/` (path preserved) / a free-form

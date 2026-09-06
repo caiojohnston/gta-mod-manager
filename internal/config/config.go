@@ -38,6 +38,17 @@ type Config struct {
 	// mid-session can't strand the user with everything disabled and no memory
 	// of what to turn back on.
 	PreCleanModIDs []string `json:"preCleanModIds,omitempty"`
+	// Downloads optionally holds direct URLs for the one-click base-tool
+	// installers. Left empty by default (the official pages have no stable
+	// download API); when set, the "Install ScriptHookV/OpenRPF" buttons can
+	// fetch the archive instead of asking the user to pick a downloaded .zip.
+	Downloads Downloads `json:"downloads,omitempty"`
+}
+
+// Downloads carries optional direct-download URLs for the base modding tools.
+type Downloads struct {
+	ScriptHookVURL string `json:"scriptHookVURL,omitempty"`
+	OpenRPFURL     string `json:"openRPFURL,omitempty"`
 }
 
 // DefaultRules mirrors SPEC.md §4.2's default table. Stored in config (not
