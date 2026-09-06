@@ -10,3 +10,7 @@ gtamod-install-*/
 Thumbs.db
 .idea/
 .vscode/
+
+# Go leaves this when the target exe is locked (app running) during build
+*.exe~
+*~
