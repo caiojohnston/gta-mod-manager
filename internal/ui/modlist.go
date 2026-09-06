@@ -60,12 +60,14 @@ func (a *App) Build() fyne.CanvasObject {
 			name.TextStyle = fyne.TextStyle{Bold: true}
 			sub := widget.NewLabel("details")
 			sub.Importance = widget.LowImportance
+			forget := widget.NewButtonWithIcon("", theme.ContentClearIcon(), nil)
+			forget.Importance = widget.LowImportance
 			uninstall := widget.NewButtonWithIcon("", theme.DeleteIcon(), nil)
 			uninstall.Importance = widget.LowImportance
 			return container.NewBorder(
 				nil, nil,
 				check,
-				uninstall,
+				container.NewHBox(forget, uninstall),
 				container.NewVBox(name, sub),
 			)
 		},
@@ -73,7 +75,9 @@ func (a *App) Build() fyne.CanvasObject {
 			mod := &a.Cfg.Mods[a.order[id]]
 			row := obj.(*fyne.Container)
 			check := row.Objects[1].(*widget.Check)
-			uninstall := row.Objects[2].(*widget.Button)
+			btns := row.Objects[2].(*fyne.Container)
+			forget := btns.Objects[0].(*widget.Button)
+			uninstall := btns.Objects[1].(*widget.Button)
 			box := row.Objects[0].(*fyne.Container)
 			name := box.Objects[0].(*widget.Label)
 			sub := box.Objects[1].(*widget.Label)
@@ -90,6 +94,11 @@ func (a *App) Build() fyne.CanvasObject {
 				}
 			}
 
+			forget.OnTapped = func() {
+				if m := a.modsBy[modID]; m != nil {
+					a.forgetMod(m)
+				}
+			}
 			uninstall.OnTapped = func() {
 				if m := a.modsBy[modID]; m != nil {
 					a.uninstallMod(m)

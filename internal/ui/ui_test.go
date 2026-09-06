@@ -89,6 +89,20 @@ func TestModListRowRenders(t *testing.T) {
 	if !check.Checked {
 		t.Error("row 0 (Alpha, enabled) should render a checked box")
 	}
+	btns := row.Objects[2].(*fyne.Container)
+	if len(btns.Objects) != 2 {
+		t.Fatalf("row should have forget + uninstall buttons, got %d", len(btns.Objects))
+	}
+	_ = btns.Objects[0].(*widget.Button)
+	_ = btns.Objects[1].(*widget.Button)
+}
+
+func TestRemoveModByIDKeepsOthers(t *testing.T) {
+	mods := []model.Mod{{ID: "a"}, {ID: "b"}, {ID: "c"}}
+	got := removeModByID(mods, "b")
+	if len(got) != 2 || got[0].ID != "a" || got[1].ID != "c" {
+		t.Fatalf("removeModByID = %+v, want [a c]", got)
+	}
 }
 
 func TestReviewListRowRenders(t *testing.T) {

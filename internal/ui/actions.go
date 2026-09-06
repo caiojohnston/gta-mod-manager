@@ -263,6 +263,24 @@ func (a *App) uninstallMod(mod *model.Mod) {
 		}, a.Win)
 }
 
+// forgetMod drops a mod from the tracked list without touching any files. Use
+// it for stale scan entries (e.g. an old whole-mods/ blob) or things you'd
+// rather manage in OpenIV — the opposite of uninstallMod, which deletes.
+func (a *App) forgetMod(mod *model.Mod) {
+	dialog.ShowConfirm("Stop tracking "+mod.Name+"?",
+		"Removes it from this list only. Every file stays on disk, untouched.\n"+
+			"Use \"Rescan folder\" to pick it up again.",
+		func(ok bool) {
+			if !ok {
+				return
+			}
+			a.Cfg.Mods = removeModByID(a.Cfg.Mods, mod.ID)
+			a.Cfg.PreCleanModIDs = removeString(a.Cfg.PreCleanModIDs, mod.ID)
+			a.persist()
+			a.Refresh()
+		}, a.Win)
+}
+
 // guardGameDir returns a non-nil error (after showing a dialog) when no game
 // folder is set, so callers can bail before touching the filesystem.
 func (a *App) guardGameDir() error {
