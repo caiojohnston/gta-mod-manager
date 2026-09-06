@@ -1,0 +1,12 @@
+# Build output
+*.exe
+/gta-mod-manager
+
+# Installer staging (created by os.MkdirTemp)
+gtamod-install-*/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
