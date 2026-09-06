@@ -137,7 +137,9 @@ func classifyDir(root, base string, rules []config.RulePattern) ([]ProposedFile,
 			RelInArchive: relSlash,
 			Kind:         kind,
 			Dest:         dest,
-			Approved:     resolved, // auto-approve only what the rule table resolved
+			// Pre-tick only files with a firm home; content routed by the
+			// mods/ heuristics is left for the user to confirm (SPEC.md §G6).
+			Approved: resolved && AutoApprove(relSlash, kind),
 		})
 		return nil
 	})
@@ -159,6 +161,10 @@ func Commit(gameDir, modName, source string, files []ProposedFile) (model.Mod, e
 			continue
 		}
 		destAbs := filepath.Join(gameDir, filepath.FromSlash(f.Dest))
+		// A user-typed Custom path must not escape the game folder.
+		if !isWithin(gameDir, destAbs) {
+			return model.Mod{}, fmt.Errorf("installer: destination %q escapes the game folder", f.Dest)
+		}
 		if err := os.MkdirAll(filepath.Dir(destAbs), 0o755); err != nil {
 			return model.Mod{}, err
 		}

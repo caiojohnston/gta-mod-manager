@@ -12,7 +12,8 @@ type FileKind string
 const (
 	KindRoot    FileKind = "root"    // .asi, dinput8.dll, ScriptHookV.dll -> game root
 	KindScripts FileKind = "scripts" // .dll / .lua -> scripts/
-	KindMods    FileKind = "mods"    // already under mods/ -> preserved as-is
+	KindMods    FileKind = "mods"    // content for the OpenRPF/OpenIV mods/ tree, path preserved
+	KindCustom  FileKind = "custom"  // user typed an explicit destination path (SPEC G6)
 	KindOther   FileKind = "other"   // matched no rule; needs manual placement
 )
 

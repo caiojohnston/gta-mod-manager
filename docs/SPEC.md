@@ -82,7 +82,13 @@ Given a `.zip` or folder:
    | already under a `mods/` path           | preserve path under `mods/`    |
    | `*.dll` not matched above               | `scripts/` (ScriptHookVDotNet convention) |
    | `*.lua`                                | `scripts/`               |
-   | anything else (readme, images, `.txt`) | **not installed** — shown as "extras", user can still force-include |
+   | under `mods/`, or `*.rpf`, or under `common/` `platform/` `dlcpacks/` `update/` | `mods/` mirror tree, **path preserved**, left unchecked for review (OpenRPF/OpenIV content) |
+   | anything else (readme, images, `.txt`) | **not installed** — shown as "extras", user can still force-include or set a Custom path |
+
+   The review screen also offers a free-form **Custom path** per file and a
+   **Set base path for all** action (prefix every file with one path), for
+   content mods whose exact target is spelled out in their ReadMe rather than
+   derivable — the app proposes, the human decides (G6).
 
 3. Present a review screen: checklist of files with their proposed destination; user can
    uncheck files they don't want, or override an individual file's destination.

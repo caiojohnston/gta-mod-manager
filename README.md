@@ -14,8 +14,14 @@ spec-driven — see [`docs/SPEC.md`](docs/SPEC.md) for scope and
   up too, ranked lower). Manual folder picker as a fallback.
 - **Install from `.zip` or folder** with a review screen: every file is
   classified by the rule table, and you can untick extras or override any file's
-  destination (Game root / `scripts/` / `mods/` / don't install) before anything
-  is copied.
+  destination — Game root / `scripts/` / `mods/` (path preserved) / a free-form
+  **Custom path**, or **Set base path for all** to prefix every file at once
+  (the fast path for content mods whose ReadMe says "everything under `mods/…`").
+- **Content mods** (RPF-tree mods: `.rpf`, `common/`, `dlcpacks/`, `platform/`,
+  `.ymt`/`.meta`/`.ytd` …) route to the `mods/` folder with their sub-path kept,
+  left unticked for you to confirm the exact target. They load in-game only with
+  **OpenRPF** (or OpenIV) installed in the game folder — this tool places the
+  files, OpenRPF makes the game read them.
 - **Toggle mods** on/off individually or in bulk (Enable all / Disable all).
   Disabling moves a mod's tracked files to `Disabled mods/<name>/` inside the
   game folder; enabling moves them back. Empty folders left behind are pruned.

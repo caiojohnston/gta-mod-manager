@@ -43,12 +43,74 @@ func TestDestinationPath(t *testing.T) {
 		{"loose.dll", model.KindScripts, "scripts/loose.dll", true},
 		{"x/mods/y.rpf", model.KindMods, "mods/y.rpf", true},
 		{"readme.txt", model.KindOther, "", false},
+
+		// content-mod path preservation
+		{"NVE v1/onigiri/common/data/decals.dat", model.KindMods, "mods/common/data/decals.dat", true},
+		{"Wrapper/onigiri/dlcpacks/NVE/dlc.rpf", model.KindMods, "mods/dlcpacks/NVE/dlc.rpf", true},
+		{"Cool Mod/some.rpf", model.KindMods, "mods/some.rpf", true},
+		{"bare/physicstasks.ymt", model.KindMods, "", false}, // no anchor: user must place it
+		{"anything", model.KindCustom, "", false},            // custom is set directly, not derived
 	}
 	for _, c := range cases {
 		got, ok := DestinationPath(c.path, c.kind)
 		if got != c.want || ok != c.wantOK {
 			t.Errorf("DestinationPath(%q,%q) = (%q,%v), want (%q,%v)", c.path, c.kind, got, ok, c.want, c.wantOK)
 		}
+	}
+}
+
+func TestAutoApprove(t *testing.T) {
+	cases := []struct {
+		path string
+		kind model.FileKind
+		want bool
+	}{
+		{"OpenIV.asi", model.KindRoot, true},
+		{"scripts/x.dll", model.KindScripts, true},
+		{"mods/update/x.rpf", model.KindMods, true},          // real mods/ folder in the archive
+		{"pack/mods/update/x.rpf", model.KindMods, true},     // ditto, nested
+		{"pack/onigiri/common/x.dat", model.KindMods, false}, // heuristic placement: needs review
+		{"pack/some.rpf", model.KindMods, false},
+		{"whatever", model.KindCustom, false},
+		{"readme.txt", model.KindOther, false},
+	}
+	for _, c := range cases {
+		if got := AutoApprove(c.path, c.kind); got != c.want {
+			t.Errorf("AutoApprove(%q,%q) = %v, want %v", c.path, c.kind, got, c.want)
+		}
+	}
+}
+
+func TestClassifyContentMods(t *testing.T) {
+	rules := config.DefaultRules()
+	cases := map[string]model.FileKind{
+		"pack/some.rpf":                       model.KindMods,
+		"NVE/onigiri/common/data/decals.dat":  model.KindMods,
+		"NVE/onigiri/platform/textures/x.ytd": model.KindMods,
+		"mod/dlcpacks/foo/dlc.rpf":            model.KindMods,
+	}
+	for p, want := range cases {
+		if got := Classify(p, rules); got != want {
+			t.Errorf("Classify(%q) = %q, want %q", p, got, want)
+		}
+	}
+}
+
+func TestCommitRejectsEscapingCustomPath(t *testing.T) {
+	tmp := t.TempDir()
+	gameDir := filepath.Join(tmp, "game")
+	src := filepath.Join(tmp, "src.txt")
+	os.MkdirAll(gameDir, 0o755)
+	os.WriteFile(src, []byte("x"), 0o644)
+
+	files := []ProposedFile{
+		{SourcePath: src, RelInArchive: "src.txt", Kind: model.KindCustom, Dest: "../../escape.txt", Approved: true},
+	}
+	if _, err := Commit(gameDir, "Evil", "src", files); err == nil {
+		t.Fatal("Commit should reject a custom Dest that escapes the game folder")
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "escape.txt")); !os.IsNotExist(err) {
+		t.Error("escape file should not have been written")
 	}
 }
 

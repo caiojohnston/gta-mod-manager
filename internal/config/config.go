@@ -46,11 +46,20 @@ func DefaultRules() []RulePattern {
 	return []RulePattern{
 		{Match: "dinput8.dll", Destination: model.KindRoot},
 		{Match: "ScriptHookV.dll", Destination: model.KindRoot},
+		{Match: "OpenIV.asi", Destination: model.KindRoot},
 		{Match: "*.asi", Destination: model.KindRoot},
 		{Match: "scripts/", Destination: model.KindScripts},
-		{Match: "mods/", Destination: model.KindMods},
-		{Match: "*.dll", Destination: model.KindScripts},
 		{Match: "*.lua", Destination: model.KindScripts},
+		{Match: "*.dll", Destination: model.KindScripts},
+		// Content mods for the OpenRPF/OpenIV mods/ tree. These route to
+		// model.KindMods; installer.DestinationPath preserves the sub-path and
+		// installer.AutoApprove leaves the heuristic ones unchecked for review.
+		{Match: "mods/", Destination: model.KindMods},
+		{Match: "*.rpf", Destination: model.KindMods},
+		{Match: "dlcpacks/", Destination: model.KindMods},
+		{Match: "update/", Destination: model.KindMods},
+		{Match: "common/", Destination: model.KindMods},
+		{Match: "platform/", Destination: model.KindMods},
 	}
 }
 

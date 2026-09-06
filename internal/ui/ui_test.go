@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -91,17 +92,50 @@ func TestModListRowRenders(t *testing.T) {
 }
 
 func TestReviewListRowRenders(t *testing.T) {
+	a, _ := newTestApp(t)
 	files := []installer.ProposedFile{
 		{RelInArchive: "ScriptHookV.dll", Kind: model.KindRoot, Dest: "ScriptHookV.dll", Approved: true},
 		{RelInArchive: "readme.txt", Kind: model.KindOther},
+		{RelInArchive: "Mod v1/onigiri/common/data/effects/decals.dat", Kind: model.KindMods, Dest: "mods/common/data/effects/decals.dat"},
 	}
-	sel := []string{destAuto, destAuto}
-	l := newReviewList(config.DefaultRules(), files, sel)
+	rc := &review{
+		a: a, rules: config.DefaultRules(), files: files,
+		selection: make([]string, len(files)), custom: make([]string, len(files)),
+		wrapper: commonWrapperDir(files),
+	}
+	rc.list = rc.newList()
 	for i := range files {
-		row := renderRow(t, l, i).(*fyne.Container)
+		row := renderRow(t, rc.list, i).(*fyne.Container)
 		_ = row.Objects[0].(*widget.Label)
 		_ = row.Objects[1].(*widget.Check)
 		_ = row.Objects[2].(*widget.Select)
+	}
+}
+
+func TestReviewBasePathAppliesToAll(t *testing.T) {
+	a, _ := newTestApp(t)
+	files := []installer.ProposedFile{
+		{RelInArchive: "Mod v1/physicstasks.ymt"},
+		{RelInArchive: "Mod v1/ReadMe.txt"},
+	}
+	rc := &review{
+		a: a, rules: config.DefaultRules(), files: files,
+		selection: make([]string, len(files)), custom: make([]string, len(files)),
+		wrapper: commonWrapperDir(files),
+	}
+	rc.list = rc.newList()
+
+	// Simulate the "Set base path for all" dialog callback body.
+	prefix := "mods/update/update.rpf/x64/data/tune"
+	for i := range rc.files {
+		rel := strings.TrimPrefix(rc.files[i].RelInArchive, rc.wrapper)
+		rc.files[i].Dest = prefix + "/" + rel
+	}
+	if files[0].Dest != "mods/update/update.rpf/x64/data/tune/physicstasks.ymt" {
+		t.Fatalf("ymt dest = %q", files[0].Dest)
+	}
+	if rc.wrapper != "Mod v1/" {
+		t.Fatalf("wrapper = %q, want \"Mod v1/\"", rc.wrapper)
 	}
 }
 

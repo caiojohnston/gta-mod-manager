@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"path"
+	"strings"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -21,11 +23,19 @@ const (
 	destAuto    = "Auto (rule table)"
 	destRoot    = "Game root"
 	destScripts = "scripts/"
-	destMods    = "mods/"
+	destMods    = "mods/ (preserve path)"
+	destCustom  = "Custom path…"
 	destSkip    = "Don't install"
 )
 
-var destOptions = []string{destAuto, destRoot, destScripts, destMods, destSkip}
+var destOptions = []string{destAuto, destRoot, destScripts, destMods, destCustom, destSkip}
+
+// junkExts never get auto-approved by "Set base path for all" — readmes,
+// screenshots, videos that ship alongside the actual mod files.
+var junkExts = map[string]bool{
+	".txt": true, ".md": true, ".pdf": true, ".png": true, ".jpg": true,
+	".jpeg": true, ".gif": true, ".webp": true, ".url": true, ".ini": false,
+}
 
 // ShowInstallWizard implements SPEC.md §4.2: pick a .zip or folder, review the
 // classified file list, override anything, then copy the approved files in.
@@ -36,8 +46,8 @@ func ShowInstallWizard(a *App) {
 
 	pickFolder := func() {
 		dialog.ShowFolderOpen(func(uri fyne.ListableURI, err error) {
-			if path, ok := fyneURIToPath(uri, err); ok {
-				a.startInstall(path)
+			if p, ok := fyneURIToPath(uri, err); ok {
+				a.startInstall(p)
 			}
 		}, a.Win)
 	}
@@ -74,16 +84,37 @@ func (a *App) startInstall(archiveOrFolder string) {
 	a.showReviewList(archiveOrFolder, files, cleanup)
 }
 
+// review holds the mutable state of one install-review screen.
+type review struct {
+	a         *App
+	rules     []config.RulePattern
+	files     []installer.ProposedFile
+	selection []string // dropdown label shown per file
+	custom    []string // last custom path typed per file
+	wrapper   string   // shared leading dir across the archive, stripped from guesses
+	list      *widget.List
+}
+
 func (a *App) showReviewList(source string, files []installer.ProposedFile, cleanup func()) {
 	var once sync.Once
 	cleanupOnce := func() { once.Do(cleanup) }
 
-	// selection[i] is the dropdown label currently shown for files[i].
-	selection := make([]string, len(files))
-	for i := range files {
-		selection[i] = destAuto
+	rc := &review{
+		a:         a,
+		rules:     a.Cfg.Rules,
+		files:     files,
+		selection: make([]string, len(files)),
+		custom:    make([]string, len(files)),
+		wrapper:   commonWrapperDir(files),
 	}
-	list := newReviewList(a.Cfg.Rules, files, selection)
+	for i := range files {
+		rc.selection[i] = destAuto
+		if files[i].Kind == model.KindCustom {
+			rc.selection[i] = destCustom
+			rc.custom[i] = files[i].Dest
+		}
+	}
+	rc.list = rc.newList()
 
 	nameEntry := widget.NewEntry()
 	nameEntry.SetText(defaultModName(source))
@@ -91,7 +122,7 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 
 	approved := func() int {
 		n := 0
-		for _, f := range files {
+		for _, f := range rc.files {
 			if f.Approved && f.Dest != "" {
 				n++
 			}
@@ -109,7 +140,7 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 			dialog.ShowInformation("Nothing selected", "Tick at least one file (with a destination) to install.", a.Win)
 			return
 		}
-		mod, err := installer.Commit(a.Cfg.GameDir, name, source, files)
+		mod, err := installer.Commit(a.Cfg.GameDir, name, source, rc.files)
 		cleanupOnce()
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("install failed: %w", err), a.Win)
@@ -123,25 +154,28 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 	})
 	confirmBtn.Importance = widget.HighImportance
 
+	basePathBtn := widget.NewButton("Set base path for all…", rc.promptBasePath)
+
 	header := container.NewVBox(
 		widget.NewForm(widget.NewFormItem("Name", nameEntry)),
-		widget.NewLabelWithStyle("Review file placement — untick extras, or override a destination:",
+		container.NewBorder(nil, nil, nil, basePathBtn,
+			widget.NewLabelWithStyle("Review placement — untick extras, or override a destination.",
+				fyne.TextAlignLeading, fyne.TextStyle{Italic: true})),
+		widget.NewLabelWithStyle("Content mods (RPF tree) need OpenRPF in the game folder to load.",
 			fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
 	)
-	content := container.NewBorder(header, confirmBtn, nil, nil, list)
+	content := container.NewBorder(header, confirmBtn, nil, nil, rc.list)
 	d = dialog.NewCustom("Review install", "Cancel", content, a.Win)
 	d.SetOnClosed(cleanupOnce)
-	d.Resize(fyne.NewSize(680, 520))
+	d.Resize(fyne.NewSize(720, 560))
 	d.Show()
 }
 
-// newReviewList builds the per-file review list for the install wizard. It's a
-// standalone function (not an inline closure) so a headless test can render a
-// row and catch template/index mismatches.
-func newReviewList(rules []config.RulePattern, files []installer.ProposedFile, selection []string) *widget.List {
-	var list *widget.List
-	list = widget.NewList(
-		func() int { return len(files) },
+// newList builds the per-file review list. Standalone (on *review) so a
+// headless test can render a row and catch template/index mismatches.
+func (rc *review) newList() *widget.List {
+	list := widget.NewList(
+		func() int { return len(rc.files) },
 		func() fyne.CanvasObject {
 			check := widget.NewCheck("", nil)
 			sel := widget.NewSelect(destOptions, nil)
@@ -152,7 +186,7 @@ func newReviewList(rules []config.RulePattern, files []installer.ProposedFile, s
 			return container.NewBorder(nil, nil, check, sel, label)
 		},
 		func(i widget.ListItemID, obj fyne.CanvasObject) {
-			f := &files[i]
+			f := &rc.files[i]
 			row := obj.(*fyne.Container)
 			label := row.Objects[0].(*widget.Label)
 			check := row.Objects[1].(*widget.Check)
@@ -163,19 +197,96 @@ func newReviewList(rules []config.RulePattern, files []installer.ProposedFile, s
 			check.OnChanged = nil
 			check.SetChecked(f.Approved)
 			idx := i
-			check.OnChanged = func(v bool) { files[idx].Approved = v }
+			check.OnChanged = func(v bool) { rc.files[idx].Approved = v }
 
 			sel.OnChanged = nil
-			sel.SetSelected(selection[i])
-			sel.OnChanged = func(choice string) {
-				selection[idx] = choice
-				applyDestChoice(&files[idx], rules, choice)
-				label.SetText(fmt.Sprintf("%s  →  %s", files[idx].RelInArchive, destSummary(&files[idx])))
-				list.Refresh()
-			}
+			sel.SetSelected(rc.selection[i])
+			sel.OnChanged = func(choice string) { rc.applyChoice(idx, choice) }
 		},
 	)
 	return list
+}
+
+// applyChoice reacts to the per-row destination dropdown.
+func (rc *review) applyChoice(i int, choice string) {
+	rc.selection[i] = choice
+	if choice == destCustom {
+		rc.promptCustomPath(i)
+		return
+	}
+	applyDestChoice(&rc.files[i], rc.rules, choice)
+	rc.redraw()
+}
+
+func (rc *review) redraw() {
+	if rc.list != nil {
+		rc.list.Refresh()
+	}
+}
+
+// promptCustomPath asks the user for an explicit destination, relative to the
+// game folder, for one file (SPEC.md §G6 — the app never guesses this).
+func (rc *review) promptCustomPath(i int) {
+	f := &rc.files[i]
+	guess := rc.custom[i]
+	if guess == "" {
+		guess = "mods/" + strings.TrimPrefix(f.RelInArchive, rc.wrapper)
+	}
+	entry := widget.NewEntry()
+	entry.SetText(guess)
+	entry.Validator = nil
+
+	form := []*widget.FormItem{
+		widget.NewFormItem("Path", entry),
+	}
+	dialog.ShowForm("Destination for "+path.Base(f.RelInArchive), "Use path", "Cancel", form,
+		func(ok bool) {
+			if !ok {
+				rc.selection[i] = destAuto
+				applyDestChoice(&rc.files[i], rc.rules, destAuto)
+				rc.redraw()
+				return
+			}
+			p := cleanRelDest(entry.Text)
+			rc.custom[i] = p
+			rc.files[i].Dest = p
+			rc.files[i].Kind = model.KindCustom
+			rc.files[i].Approved = p != ""
+			rc.redraw()
+		}, rc.a.Win)
+}
+
+// promptBasePath asks for one prefix and applies it to every non-junk file:
+// <prefix>/<archive path minus the shared wrapper dir>. This is the fast path
+// for content mods where the ReadMe says "everything goes under mods/…".
+func (rc *review) promptBasePath() {
+	entry := widget.NewEntry()
+	entry.SetPlaceHolder("e.g. mods/update/update.rpf")
+	entry.SetText("mods")
+	info := widget.NewLabelWithStyle(
+		"Applies <prefix>/<file path> to every file (readmes/images left unticked).",
+		fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+
+	dialog.ShowForm("Set base path for all files", "Apply", "Cancel",
+		[]*widget.FormItem{widget.NewFormItem("Base path", entry), widget.NewFormItem("", info)},
+		func(ok bool) {
+			if !ok {
+				return
+			}
+			prefix := cleanRelDest(entry.Text)
+			for i := range rc.files {
+				rel := strings.TrimPrefix(rc.files[i].RelInArchive, rc.wrapper)
+				dest := path.Join(prefix, rel)
+				rc.files[i].Dest = dest
+				rc.files[i].Kind = model.KindCustom
+				rc.files[i].Approved = !junkExts[strings.ToLower(path.Ext(rel))]
+				rc.custom[i] = dest
+				rc.selection[i] = destCustom
+			}
+			if rc.list != nil {
+				rc.list.Refresh()
+			}
+		}, rc.a.Win)
 }
 
 func destSummary(f *installer.ProposedFile) string {
@@ -183,6 +294,43 @@ func destSummary(f *installer.ProposedFile) string {
 		return "(no destination — won't be installed)"
 	}
 	return f.Dest
+}
+
+// cleanRelDest normalises a user-typed destination: forward slashes, no
+// leading slash, no "." / ".." segments (those are rejected again in
+// installer.Commit, this just keeps the display sane).
+func cleanRelDest(s string) string {
+	s = strings.ReplaceAll(strings.TrimSpace(s), "\\", "/")
+	s = strings.TrimPrefix(s, "/")
+	parts := make([]string, 0, strings.Count(s, "/")+1)
+	for _, seg := range strings.Split(s, "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			continue
+		}
+		parts = append(parts, seg)
+	}
+	return strings.Join(parts, "/")
+}
+
+// commonWrapperDir returns the single leading directory shared by every file in
+// the archive (many mods ship inside one "Cool Mod v1/" folder), or "" if the
+// files don't all share one.
+func commonWrapperDir(files []installer.ProposedFile) string {
+	if len(files) == 0 {
+		return ""
+	}
+	first := files[0].RelInArchive
+	slash := strings.IndexByte(first, '/')
+	if slash < 0 {
+		return ""
+	}
+	prefix := first[:slash+1]
+	for _, f := range files {
+		if !strings.HasPrefix(f.RelInArchive, prefix) {
+			return ""
+		}
+	}
+	return prefix
 }
 
 func defaultModName(source string) string {
@@ -201,9 +349,10 @@ func defaultModName(source string) string {
 	return base
 }
 
-// applyDestChoice rewrites a ProposedFile's Kind/Dest/Approved to match the
-// dropdown selection the user made.
+// applyDestChoice rewrites a ProposedFile's Kind/Dest/Approved to match a
+// non-custom dropdown selection.
 func applyDestChoice(f *installer.ProposedFile, rules []config.RulePattern, choice string) {
+	explicit := true
 	switch choice {
 	case destSkip:
 		f.Approved = false
@@ -212,6 +361,7 @@ func applyDestChoice(f *installer.ProposedFile, rules []config.RulePattern, choi
 		return
 	case destAuto:
 		f.Kind = installer.Classify(f.RelInArchive, rules)
+		explicit = false
 	case destRoot:
 		f.Kind = model.KindRoot
 	case destScripts:
@@ -221,5 +371,7 @@ func applyDestChoice(f *installer.ProposedFile, rules []config.RulePattern, choi
 	}
 	dest, ok := installer.DestinationPath(f.RelInArchive, f.Kind)
 	f.Dest = dest
-	f.Approved = ok
+	// An explicit dropdown pick is trusted; "Auto" defers to the cautious
+	// AutoApprove heuristic so guessed content-mod paths stay unticked.
+	f.Approved = ok && (explicit || installer.AutoApprove(f.RelInArchive, f.Kind))
 }
