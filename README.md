@@ -31,6 +31,13 @@ on what to do instead (extract first / use OpenIV).
   destination — Game root / `scripts/` / `mods/` (path preserved) / a free-form
   **Custom path**, or **Set base path for all** to prefix every file at once
   (the fast path for content mods whose ReadMe says "everything under `mods/…`").
+- **Add-on dlcpacks** — a `dlc.rpf` (in `<pack>/dlc.rpf` or `…/dlcpacks/<pack>/
+  dlc.rpf`) is routed to `mods/update/x64/dlcpacks/<pack>/dlc.rpf`, and after
+  install the app offers to add `<Item>dlcpacks:/<pack>/</Item>` to the loose
+  `mods/update/update.rpf/common/data/dlclist.xml` (**Register dlcpacks** button
+  does it for already-installed packs too). One-time prep it can't do: extract
+  `dlclist.xml` from `update.rpf` once with CodeWalker/OpenIV, and copy
+  `update/update.rpf` to `mods/update/update.rpf`.
 - **Content mods** (RPF-tree mods: `.rpf`, `common/`, `dlcpacks/`, `platform/`,
   `.ymt`/`.meta`/`.ytd` …) route to the `mods/` folder with their sub-path kept,
   left unticked for you to confirm the exact target. They load in-game only with

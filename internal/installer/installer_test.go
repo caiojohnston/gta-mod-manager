@@ -46,10 +46,15 @@ func TestDestinationPath(t *testing.T) {
 
 		// content-mod path preservation
 		{"NVE v1/onigiri/common/data/decals.dat", model.KindMods, "mods/common/data/decals.dat", true},
-		{"Wrapper/onigiri/dlcpacks/NVE/dlc.rpf", model.KindMods, "mods/dlcpacks/NVE/dlc.rpf", true},
 		{"Cool Mod/some.rpf", model.KindMods, "mods/some.rpf", true},
 		{"bare/physicstasks.ymt", model.KindMods, "", false}, // no anchor: user must place it
 		{"anything", model.KindCustom, "", false},            // custom is set directly, not derived
+
+		// add-on dlcpacks always normalise to mods/update/x64/dlcpacks/<pack>/dlc.rpf
+		{"vremastered/dlc.rpf", model.KindMods, "mods/update/x64/dlcpacks/vremastered/dlc.rpf", true},
+		{"a80/dlc.rpf", model.KindMods, "mods/update/x64/dlcpacks/a80/dlc.rpf", true},
+		{"Add-on/x64/dlcpacks/lc200/dlc.rpf", model.KindMods, "mods/update/x64/dlcpacks/lc200/dlc.rpf", true},
+		{"dlc.rpf", model.KindMods, "", false}, // bare, no pack name
 	}
 	for _, c := range cases {
 		got, ok := DestinationPath(c.path, c.kind)

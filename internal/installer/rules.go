@@ -74,6 +74,15 @@ func DestinationPath(relPath string, kind model.FileKind) (string, bool) {
 		if idx := strings.Index(lower, "mods/"); idx >= 0 {
 			return relPath[idx:], true
 		}
+		// An add-on dlcpack is always "<pack>/dlc.rpf" or ".../dlcpacks/<pack>/
+		// dlc.rpf" in the archive but must land at
+		// mods/update/x64/dlcpacks/<pack>/dlc.rpf regardless.
+		if strings.EqualFold(base, "dlc.rpf") {
+			if pack := dlcPackName(relPath); pack != "" {
+				return path.Join("mods/update/x64/dlcpacks", pack, "dlc.rpf"), true
+			}
+			return "", false // bare dlc.rpf, no folder to name the pack — ask the user
+		}
 		// Content that mirrors the game's virtual FS (common/, dlcpacks/, ...):
 		// preserve everything from the first anchor onward, under mods/. Checked
 		// before the bare-.rpf case so a dlcpacks/foo/dlc.rpf keeps its folder.
@@ -128,6 +137,25 @@ func firstAnchorIndex(lower string) int {
 		}
 	}
 	return best
+}
+
+// dlcPackName pulls the dlcpack name out of an archive path ending in dlc.rpf:
+// the segment after "dlcpacks/" if present, otherwise the immediate parent
+// folder ("a80/dlc.rpf" -> "a80"). Returns "" for a bare "dlc.rpf".
+func dlcPackName(relPath string) string {
+	rel := strings.TrimSuffix(relPath, "/dlc.rpf")
+	rel = strings.TrimSuffix(rel, "/DLC.RPF")
+	if rel == relPath { // no slash before dlc.rpf
+		return ""
+	}
+	if i := strings.LastIndex(strings.ToLower(rel), "dlcpacks/"); i >= 0 {
+		seg := rel[i+len("dlcpacks/"):]
+		if j := strings.IndexByte(seg, '/'); j >= 0 {
+			seg = seg[:j]
+		}
+		return seg
+	}
+	return path.Base(rel)
 }
 
 // stripWrapperDir drops a single leading directory ("Cool Mod v1/foo/bar" ->

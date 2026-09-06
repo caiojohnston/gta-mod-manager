@@ -246,6 +246,7 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 		a.Refresh()
 		d.Hide()
 		dialog.ShowInformation("Installed", fmt.Sprintf("%q added with %d file(s).", mod.Name, len(mod.Files)), a.Win)
+		a.offerDlcRegistration(mod)
 	}
 
 	confirmBtn := widget.NewButton("Install approved files", func() {

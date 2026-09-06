@@ -112,6 +112,7 @@ func (a *App) Build() fyne.CanvasObject {
 	setDirBtn := widget.NewButton("Set folder manually...", a.handleSetGameDir)
 	installBtn := widget.NewButton("Install mod...", a.handleInstall)
 	rescanBtn := widget.NewButton("Rescan folder", func() { a.scanAndImport(true) })
+	dlcBtn := widget.NewButton("Register dlcpacks", a.registerDlcPacksFromAll)
 	profilesBtn := widget.NewButton("Profiles...", func() { ShowProfilesPanel(a) })
 
 	enableAllBtn := widget.NewButton("Enable all", a.enableAll)
@@ -129,11 +130,11 @@ func (a *App) Build() fyne.CanvasObject {
 	runBtn.Importance = widget.HighImportance
 
 	a.needGameDirButtons = []*widget.Button{
-		installBtn, rescanBtn, profilesBtn, enableAllBtn, disableAllBtn,
+		installBtn, rescanBtn, dlcBtn, profilesBtn, enableAllBtn, disableAllBtn,
 		shvBtn, openRPFBtn, runBtn,
 	}
 
-	topRow := container.NewHBox(detectBtn, setDirBtn, installBtn, rescanBtn, profilesBtn)
+	topRow := container.NewHBox(detectBtn, setDirBtn, installBtn, rescanBtn, dlcBtn, profilesBtn)
 	baseRow := container.NewHBox(
 		widget.NewLabelWithStyle("Base:", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
 		shvBtn, openRPFBtn, openIVBtn,
