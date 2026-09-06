@@ -131,15 +131,7 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 	}
 
 	var d dialog.Dialog
-	confirmBtn := widget.NewButton("Install approved files", func() {
-		name := nameEntry.Text
-		if name == "" {
-			name = defaultModName(source)
-		}
-		if approved() == 0 {
-			dialog.ShowInformation("Nothing selected", "Tick at least one file (with a destination) to install.", a.Win)
-			return
-		}
+	doCommit := func(name string) {
 		mod, err := installer.Commit(a.Cfg.GameDir, name, source, rc.files)
 		cleanupOnce()
 		if err != nil {
@@ -151,6 +143,35 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 		a.Refresh()
 		d.Hide()
 		dialog.ShowInformation("Installed", fmt.Sprintf("%q added with %d file(s).", mod.Name, len(mod.Files)), a.Win)
+	}
+
+	confirmBtn := widget.NewButton("Install approved files", func() {
+		name := nameEntry.Text
+		if name == "" {
+			name = defaultModName(source)
+		}
+		if approved() == 0 {
+			dialog.ShowInformation("Nothing selected", "Tick at least one file (with a destination) to install.", a.Win)
+			return
+		}
+		// Warn about raw-XML meta files: the game only reads the compiled
+		// binary, and this tool copies, it doesn't convert (needs CodeWalker).
+		if raw := installer.UncompiledMeta(rc.files); len(raw) > 0 {
+			dialog.ShowCustomConfirm("Uncompiled XML detected", "Install anyway", "Cancel",
+				widget.NewLabel(fmt.Sprintf(
+					"%d file(s) are editable XML, not the binary form GTA loads:\n\n  %s\n\n"+
+						"Open them in CodeWalker (drag into the same mods/ path, accept the\n"+
+						"conversion) or the change won't apply. Installing now just copies\n"+
+						"the XML as-is.",
+					len(raw), strings.Join(raw, "\n  "))),
+				func(ok bool) {
+					if ok {
+						doCommit(name)
+					}
+				}, a.Win)
+			return
+		}
+		doCommit(name)
 	})
 	confirmBtn.Importance = widget.HighImportance
 
