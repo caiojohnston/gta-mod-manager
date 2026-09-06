@@ -110,7 +110,13 @@ func (a *App) downloadThenInstall(name, rawURL string, install func(string)) {
 }
 
 func downloadArchive(rawURL string) (string, error) {
-	client := &http.Client{Timeout: 5 * time.Minute}
+	return downloadTo(rawURL, os.TempDir())
+}
+
+// downloadTo fetches rawURL into destDir, keeping the URL's basename (falling
+// back to download.bin), and returns the saved path.
+func downloadTo(rawURL, destDir string) (string, error) {
+	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get(rawURL)
 	if err != nil {
 		return "", err
@@ -121,10 +127,17 @@ func downloadArchive(rawURL string) (string, error) {
 	}
 
 	name := filepath.Base(rawURL)
-	if !strings.HasSuffix(strings.ToLower(name), ".zip") {
-		name = "download.zip"
+	if name == "" || name == "." || name == "/" || !strings.Contains(name, ".") {
+		name = "download.bin"
 	}
-	out, err := os.CreateTemp("", "gtamod-dl-*-"+name)
+	dst := filepath.Join(destDir, name)
+	if destDir == os.TempDir() {
+		if f, err := os.CreateTemp(destDir, "gtamod-dl-*-"+name); err == nil {
+			dst = f.Name()
+			f.Close()
+		}
+	}
+	out, err := os.Create(dst)
 	if err != nil {
 		return "", err
 	}
@@ -132,7 +145,7 @@ func downloadArchive(rawURL string) (string, error) {
 	if _, err := io.Copy(out, resp.Body); err != nil {
 		return "", err
 	}
-	return out.Name(), nil
+	return dst, nil
 }
 
 // findDownloadedArchive looks in the user's Downloads folder for a .zip whose
@@ -176,6 +189,69 @@ func findDownloadedArchive(hints []string) string {
 		}
 	}
 	return best
+}
+
+// ShowGetOpenIV helps the user obtain OpenIV — the separate desktop app needed
+// to install .oiv packages (RGS, E.R.O, gore mods…). This app can't run .oiv
+// itself. The installer is only ever downloaded to the Downloads folder, never
+// executed.
+func (a *App) ShowGetOpenIV() {
+	const page = "https://openiv.com/"
+	var d dialog.Dialog
+
+	body := container.NewVBox(
+		widget.NewLabel(
+			"OpenIV is a separate app. You need it for .oiv mod packages.\n"+
+				"Install OpenIV, then: Tools → Package Installer → choose the .oiv →\n"+
+				"install into the \"mods\" folder. OpenRPF (already installed) loads it in-game."),
+		widget.NewSeparator(),
+	)
+
+	body.Add(widget.NewButton("Open openiv.com", func() {
+		if u, err := url.Parse(page); err == nil {
+			_ = fyne.CurrentApp().OpenURL(u)
+		}
+	}))
+
+	if u := a.Cfg.Downloads.OpenIVURL; u != "" {
+		body.Add(widget.NewButton("Download installer to Downloads folder", func() {
+			d.Hide()
+			a.downloadInstaller("OpenIV", u)
+		}))
+	}
+
+	d = dialog.NewCustom("Get OpenIV", "Close", body, a.Win)
+	d.Show()
+}
+
+// downloadInstaller saves a tool installer into the user's Downloads folder and
+// tells them where it landed. It does not execute anything.
+func (a *App) downloadInstaller(name, rawURL string) {
+	dialog.ShowConfirm("Download "+name+"?",
+		"Fetch from:\n"+rawURL+"\n\nSaved to your Downloads folder. You run the installer yourself.",
+		func(ok bool) {
+			if !ok {
+				return
+			}
+			home, err := os.UserHomeDir()
+			if err != nil {
+				dialog.ShowError(err, a.Win)
+				return
+			}
+			dst := filepath.Join(home, "Downloads")
+			prog := dialog.NewCustomWithoutButtons("Downloading "+name+"…", widget.NewProgressBarInfinite(), a.Win)
+			prog.Show()
+			go func() {
+				path, err := downloadTo(rawURL, dst)
+				prog.Hide()
+				if err != nil {
+					dialog.ShowError(fmt.Errorf("download failed: %w", err), a.Win)
+					return
+				}
+				dialog.ShowInformation("Downloaded",
+					name+" saved to:\n"+path+"\n\nRun it to install "+name+".", a.Win)
+			}()
+		}, a.Win)
 }
 
 // runGTA launches the game through the platform launcher (PlayGTAV.exe).

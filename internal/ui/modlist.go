@@ -115,6 +115,7 @@ func (a *App) Build() fyne.CanvasObject {
 	openRPFBtn := widget.NewButton("Install OpenRPF", func() {
 		a.ShowInstallBaseTool(installer.OpenRPFPreset(), a.Cfg.Downloads.OpenRPFURL)
 	})
+	openIVBtn := widget.NewButton("Get OpenIV", a.ShowGetOpenIV) // .oiv packages, no game dir needed
 	runBtn := widget.NewButtonWithIcon("Run GTA", theme.MediaPlayIcon(), a.runGTA)
 	runBtn.Importance = widget.HighImportance
 
@@ -126,7 +127,7 @@ func (a *App) Build() fyne.CanvasObject {
 	topRow := container.NewHBox(detectBtn, setDirBtn, installBtn, rescanBtn, profilesBtn)
 	baseRow := container.NewHBox(
 		widget.NewLabelWithStyle("Base:", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
-		shvBtn, openRPFBtn,
+		shvBtn, openRPFBtn, openIVBtn,
 		widget.NewSeparator(),
 		runBtn,
 	)

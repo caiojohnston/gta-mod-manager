@@ -49,6 +49,9 @@ type Config struct {
 type Downloads struct {
 	ScriptHookVURL string `json:"scriptHookVURL,omitempty"`
 	OpenRPFURL     string `json:"openRPFURL,omitempty"`
+	// OpenIVURL, if set, points at the OpenIV installer .exe so the "Get
+	// OpenIV" button can save it to Downloads (it is never run automatically).
+	OpenIVURL string `json:"openIVURL,omitempty"`
 }
 
 // DefaultRules mirrors SPEC.md §4.2's default table. Stored in config (not

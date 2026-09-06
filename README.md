@@ -18,8 +18,14 @@ spec-driven — see [`docs/SPEC.md`](docs/SPEC.md) for scope and
   (`ScriptHookV.dll`/`dinput8.dll` in root; only `OpenIV.asi` for OpenRPF, its
   proxy DLLs skipped so they don't clobber ScriptHookV's). Set a direct URL in
   `config.json` → `downloads` and the button downloads it itself.
+- **Get OpenIV** — opens openiv.com (and, with `downloads.openIVURL` set,
+  saves the installer to your Downloads folder — never runs it). OpenIV is the
+  separate app that installs `.oiv` packages, which this tool doesn't handle.
 - **Run GTA** — launches the game via `PlayGTAV.exe` (the shim that hands off to
   Steam/Epic/Rockstar), falling back to `GTA5_Enhanced.exe`.
+
+`.rar`/`.7z` archives and `.oiv` packages are detected and refused with a note
+on what to do instead (extract first / use OpenIV).
 - **Install from `.zip` or folder** with a review screen: every file is
   classified by the rule table, and you can untick extras or override any file's
   destination — Game root / `scripts/` / `mods/` (path preserved) / a free-form
