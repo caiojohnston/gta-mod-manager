@@ -20,18 +20,26 @@ func TestScriptHookVPreset(t *testing.T) {
 	files := []ProposedFile{
 		{RelInArchive: "bin/ScriptHookV.dll"},
 		{RelInArchive: "bin/dinput8.dll"},
+		{RelInArchive: "bin/xinput1_4.dll"},
 		{RelInArchive: "bin/NativeTrainer.asi"},
+		{RelInArchive: "bin/args.txt"},
 		{RelInArchive: "bin/ScriptHookV.lib"},
 		{RelInArchive: "ReadMe.txt"},
 	}
 	ScriptHookVPreset().Apply(files)
 
 	got := approvedDests(files)
-	if len(got) != 3 {
-		t.Fatalf("approved %d files, want 3: %v", len(got), got)
+	if len(got) != 5 {
+		t.Fatalf("approved %d files, want 5: %v", len(got), got)
 	}
 	if got["bin/ScriptHookV.dll"] != "ScriptHookV.dll" || got["bin/dinput8.dll"] != "dinput8.dll" {
 		t.Errorf("core files land in root by basename: %v", got)
+	}
+	if got["bin/args.txt"] != "args.txt" {
+		t.Error("args.txt must be installed (disables Enhanced anticheat for .asi loading)")
+	}
+	if _, ok := got["ReadMe.txt"]; ok {
+		t.Error("ReadMe.txt should not be approved")
 	}
 	for _, f := range files {
 		if f.RelInArchive == "bin/ScriptHookV.dll" && f.Kind != model.KindRoot {

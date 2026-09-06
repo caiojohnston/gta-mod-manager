@@ -25,13 +25,17 @@ type Preset struct {
 }
 
 // ScriptHookVPreset installs Alexander Blade's ScriptHookV: the ASI loader
-// (dinput8.dll) + ScriptHookV.dll in the game root, plus the bundled
-// NativeTrainer.asi. .lib and .txt are skipped.
+// (dinput8.dll + xinput1_4.dll), ScriptHookV.dll, the bundled NativeTrainer.asi,
+// and — critically for GTA V Enhanced — args.txt, which carries "-nobattleye"
+// so the in-game anticheat lets .asi plugins load. Without args.txt the loader
+// injects but loads nothing and writes no log. Other .txt and .lib are skipped.
 func ScriptHookVPreset() Preset {
 	root := map[string]bool{
 		"scripthookv.dll":   true,
 		"dinput8.dll":       true,
+		"xinput1_4.dll":     true,
 		"nativetrainer.asi": true,
+		"args.txt":          true,
 	}
 	return Preset{
 		Name:         "ScriptHookV",
