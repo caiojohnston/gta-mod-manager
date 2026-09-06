@@ -54,8 +54,12 @@ on what to do instead (extract first / use OpenIV).
   behind a confirmation.
 - **Safety**: refuses every file move while `GTA5_Enhanced.exe` is running;
   never touches `.rpf` archives.
-- First-run scan imports mods already sitting in the folder (`.asi`,
-  `dinput8.dll`, `ScriptHookV.dll`, `scripts/`, `mods/`) so nothing is lost.
+- First-run scan (and **Rescan folder**) imports mods already sitting in the
+  folder — loose `.asi`/`dinput8.dll`/`dsound.dll`/`ScriptHookV.dll`, the
+  `scripts/` folder, and **one entry per child of `mods/`** (`mods/update`,
+  `mods/x64`, `mods/common.rpf`, …) so an OpenIV "install to mods folder" is
+  toggleable here in useful chunks. Only files not already tracked are picked
+  up, so app installs and OpenIV installs don't collide.
 
 Config + mod registry live at `%AppData%\GTAVGoModManager\config.json`.
 

@@ -1,8 +1,7 @@
-// Package scanner implements SPEC.md §4.1: on first pointing the app at a
-// game folder, detect files that look like a pre-existing manual mod install
-// (same heuristic patterns as the reference tool the user found) and offer
-// to import them as tracked mods, so nothing already installed is lost or
-// duplicated on the next install/toggle.
+// Package scanner implements SPEC.md §4.1: detect files that look like a
+// pre-existing manual mod install (whether dropped in by hand or by OpenIV's
+// package installer) and import them as tracked mods, so nothing already
+// installed is invisible to the toggle/profile features.
 package scanner
 
 import (
@@ -20,12 +19,13 @@ import (
 var knownRootFiles = map[string]bool{
 	"dinput8.dll":     true,
 	"scripthookv.dll": true,
+	"dsound.dll":      true,
 }
 
-// FindUnmanaged scans gameDir's top level for mod-like entries that aren't
-// already referenced by any mod in existingMods, and returns one proposed
-// Mod per top-level item (a single loose file, or a whole folder like
-// scripts/ or mods/ as one unit — matching how most mods are distributed).
+// FindUnmanaged scans gameDir for mod-like content not already referenced by
+// existingMods: loose root files/DLLs, the scripts/ folder as one unit, and —
+// so an OpenIV "install to mods folder" is manageable here — one entry per
+// immediate child of mods/ (mods/update, mods/x64, mods/common.rpf, …).
 func FindUnmanaged(gameDir string, rules []config.RulePattern, existingMods []model.Mod) ([]model.Mod, error) {
 	tracked := make(map[string]bool)
 	for _, m := range existingMods {
@@ -44,8 +44,16 @@ func FindUnmanaged(gameDir string, rules []config.RulePattern, existingMods []mo
 		name := e.Name()
 		lower := filepath.ToSlash(name)
 
-		if e.IsDir() && (lower == "scripts" || lower == "mods") {
-			mod, err := importFolderAsMod(gameDir, name, rules, tracked)
+		if e.IsDir() && lower == "mods" {
+			children, err := importModsChildren(gameDir, rules, tracked)
+			if err != nil {
+				return nil, err
+			}
+			found = append(found, children...)
+			continue
+		}
+		if e.IsDir() && lower == "scripts" {
+			mod, err := importFolderAsMod(gameDir, name, "scanned", rules, tracked)
 			if err != nil {
 				return nil, err
 			}
@@ -55,14 +63,12 @@ func FindUnmanaged(gameDir string, rules []config.RulePattern, existingMods []mo
 			continue
 		}
 		if e.IsDir() {
-			continue // some other folder (saves, etc.) — not a mod pattern, leave alone
+			continue // saves, update, x64, … — not a mod pattern, leave alone
 		}
 		if tracked[lower] {
 			continue
 		}
-		isKnown := knownRootFiles[filepathLower(name)]
-		isAsi := filepath.Ext(name) == ".asi"
-		if isKnown || isAsi {
+		if knownRootFiles[filepathLower(name)] || filepath.Ext(name) == ".asi" {
 			found = append(found, model.Mod{
 				ID:      uuid.NewString(),
 				Name:    name,
@@ -75,15 +81,55 @@ func FindUnmanaged(gameDir string, rules []config.RulePattern, existingMods []mo
 	return found, nil
 }
 
-func importFolderAsMod(gameDir, folderName string, rules []config.RulePattern, tracked map[string]bool) (model.Mod, error) {
+// importModsChildren makes one Mod per immediate child of mods/ so a merged
+// mods/ tree (OpenIV packages + hand installs) can still be toggled in useful
+// chunks rather than all-or-nothing.
+func importModsChildren(gameDir string, rules []config.RulePattern, tracked map[string]bool) ([]model.Mod, error) {
+	modsRoot := filepath.Join(gameDir, "mods")
+	kids, err := os.ReadDir(modsRoot)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.Mod
+	for _, k := range kids {
+		rel := "mods/" + filepath.ToSlash(k.Name())
+		mod := model.Mod{
+			ID:      uuid.NewString(),
+			Name:    rel,
+			Enabled: true,
+			Source:  "scanned (mods/)",
+		}
+		if k.IsDir() {
+			if err := walkInto(gameDir, filepath.Join(modsRoot, k.Name()), rules, tracked, &mod); err != nil {
+				return nil, err
+			}
+		} else if !tracked[rel] {
+			mod.Files = append(mod.Files, model.ModFile{
+				RelPath: rel, Kind: installer.Classify(rel, rules),
+			})
+		}
+		if len(mod.Files) > 0 {
+			out = append(out, mod)
+		}
+	}
+	return out, nil
+}
+
+func importFolderAsMod(gameDir, folderName, source string, rules []config.RulePattern, tracked map[string]bool) (model.Mod, error) {
 	mod := model.Mod{
 		ID:      uuid.NewString(),
 		Name:    folderName,
 		Enabled: true,
-		Source:  "scanned",
+		Source:  source,
 	}
-	root := filepath.Join(gameDir, folderName)
-	err := filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
+	err := walkInto(gameDir, filepath.Join(gameDir, folderName), rules, tracked, &mod)
+	return mod, err
+}
+
+// walkInto adds every untracked file under root to mod.Files, path relative to
+// gameDir.
+func walkInto(gameDir, root string, rules []config.RulePattern, tracked map[string]bool, mod *model.Mod) error {
+	return filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err
 		}
@@ -95,11 +141,11 @@ func importFolderAsMod(gameDir, folderName string, rules []config.RulePattern, t
 		if tracked[relSlash] {
 			return nil
 		}
-		kind := installer.Classify(relSlash, rules)
-		mod.Files = append(mod.Files, model.ModFile{RelPath: relSlash, Kind: kind})
+		mod.Files = append(mod.Files, model.ModFile{
+			RelPath: relSlash, Kind: installer.Classify(relSlash, rules),
+		})
 		return nil
 	})
-	return mod, err
 }
 
 func filepathLower(s string) string {

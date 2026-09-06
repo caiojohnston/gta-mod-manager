@@ -20,7 +20,10 @@ func TestFindUnmanaged(t *testing.T) {
 	write("OpenIV.asi")
 	write("scripts/Trainer.dll")
 	write("scripts/Trainer.ini")
-	write("mods/update.rpf")
+	write("mods/update/update.rpf/common/data/ai/weapons.meta") // OpenIV RGS-style
+	write("mods/update/x64/dlcpacks/foo/dlc.rpf")
+	write("mods/x64/audio/sfx/RESIDENT.rpf/explosions.awc")
+	write("mods/loose.asi")
 	write("PlayGTAV.exe")       // not a mod pattern
 	write("Profiles/save1.sav") // unrelated folder, must be ignored
 
@@ -32,22 +35,29 @@ func TestFindUnmanaged(t *testing.T) {
 	names := map[string]int{} // name -> file count
 	for _, m := range found {
 		names[m.Name] = len(m.Files)
-		if m.Source != "scanned" {
-			t.Errorf("%s source = %q, want scanned", m.Name, m.Source)
-		}
 	}
 
-	if _, ok := names["dinput8.dll"]; !ok {
+	if names["dinput8.dll"] == 0 {
 		t.Error("dinput8.dll not detected")
 	}
-	if _, ok := names["OpenIV.asi"]; !ok {
+	if names["OpenIV.asi"] == 0 {
 		t.Error("OpenIV.asi not detected")
 	}
 	if names["scripts"] != 2 {
 		t.Errorf("scripts folder mod = %d files, want 2", names["scripts"])
 	}
-	if names["mods"] != 1 {
-		t.Errorf("mods folder mod = %d files, want 1", names["mods"])
+	// mods/ is split per immediate child.
+	if names["mods/update"] != 2 {
+		t.Errorf("mods/update = %d files, want 2", names["mods/update"])
+	}
+	if names["mods/x64"] != 1 {
+		t.Errorf("mods/x64 = %d files, want 1", names["mods/x64"])
+	}
+	if names["mods/loose.asi"] != 1 {
+		t.Errorf("mods/loose.asi = %d files, want 1", names["mods/loose.asi"])
+	}
+	if _, ok := names["mods"]; ok {
+		t.Error("mods/ should not be imported as a single blob")
 	}
 	if _, ok := names["PlayGTAV.exe"]; ok {
 		t.Error("PlayGTAV.exe should not be treated as a mod")
