@@ -72,6 +72,18 @@ func (a *App) registerPacks(packs []string) {
 					a.Win)
 			}, a.Win)
 
+	case dlclist.StatusPackedRPF:
+		msg := widget.NewLabel(fmt.Sprintf(
+			"The dlc.rpf file(s) are in place. To load them, add:\n\n%s\n\n"+
+				"Your mods/update/update.rpf is a packed RPF (OpenIV installed it),\n"+
+				"so edit dlclist.xml inside it with OpenIV:\n"+
+				"  1. OpenIV → pick the GTA V folder, turn on Edit mode\n"+
+				"  2. Go to mods/update/update.rpf/common/data/dlclist.xml\n"+
+				"  3. Edit → add the line(s) above before </Paths> → Ctrl+S\n\n"+
+				"(The app can only edit a loose dlclist.xml, not one inside a packed RPF.)",
+			lines))
+		dialog.ShowCustom("Edit dlclist.xml in OpenIV", "OK", msg, a.Win)
+
 	case dlclist.StatusMissing:
 		msg := widget.NewLabel(fmt.Sprintf(
 			"The dlc.rpf file(s) are in place, but they won't load until this line\n"+

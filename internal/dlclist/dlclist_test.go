@@ -79,8 +79,19 @@ func TestCheck(t *testing.T) {
 	if Check(dir) != StatusMissing {
 		t.Error("want StatusMissing on empty dir")
 	}
+
+	// A packed RPF file at mods/update/update.rpf.
+	packed := filepath.Join(dir, "mods", "update", "update.rpf")
+	os.MkdirAll(filepath.Dir(packed), 0o755)
+	os.WriteFile(packed, []byte("RPF8 packed bytes"), 0o644)
+	if Check(dir) != StatusPackedRPF {
+		t.Error("want StatusPackedRPF when update.rpf is a file")
+	}
+
+	// Replace it with the loose tree.
+	os.Remove(packed)
 	writeDlclist(t, dir, sample)
 	if Check(dir) != StatusEditable {
-		t.Error("want StatusEditable once the file exists")
+		t.Error("want StatusEditable once the loose file exists")
 	}
 }

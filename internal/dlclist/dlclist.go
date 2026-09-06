@@ -52,16 +52,24 @@ func LoosePath(gameDir string) string {
 type Status int
 
 const (
-	// StatusMissing: no loose dlclist.xml — the user must extract one once.
+	// StatusMissing: no mods/update/update.rpf at all — nothing to amend yet.
 	StatusMissing Status = iota
-	// StatusEditable: the loose file exists and can be amended.
+	// StatusEditable: a loose dlclist.xml exists and can be amended in place.
 	StatusEditable
+	// StatusPackedRPF: mods/update/update.rpf is a real packed RPF (OpenIV
+	// style), so dlclist.xml must be edited inside it with OpenIV/CodeWalker.
+	StatusPackedRPF
 )
 
-// Check reports whether the loose dlclist.xml exists.
+// Check reports how the dlclist.xml for gameDir can be reached.
 func Check(gameDir string) Status {
 	if _, err := os.Stat(LoosePath(gameDir)); err == nil {
 		return StatusEditable
+	}
+	// mods/update/update.rpf present but not as a directory tree => packed.
+	rpf := filepath.Join(gameDir, "mods", "update", "update.rpf")
+	if st, err := os.Stat(rpf); err == nil && !st.IsDir() {
+		return StatusPackedRPF
 	}
 	return StatusMissing
 }
