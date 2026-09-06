@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/caiojohnston/gta-mod-manager/internal/config"
+	"github.com/caiojohnston/gta-mod-manager/internal/model"
 	"github.com/google/uuid"
-	"github.com/user/gta-mod-manager/internal/config"
-	"github.com/user/gta-mod-manager/internal/model"
 )
 
 // ProposedFile is one entry in the review screen (SPEC.md §4.2 step 3):

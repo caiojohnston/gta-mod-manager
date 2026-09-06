@@ -4,17 +4,16 @@ package main
 
 import (
 	"log"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/dialog"
 
-	"github.com/user/gta-mod-manager/internal/config"
-	"github.com/user/gta-mod-manager/internal/model"
-	"github.com/user/gta-mod-manager/internal/scanner"
-	"github.com/user/gta-mod-manager/internal/ui"
+	"github.com/caiojohnston/gta-mod-manager/internal/config"
+	"github.com/caiojohnston/gta-mod-manager/internal/ui"
 )
+
+// version is stamped into the window title; bump on release.
+const version = "v1.0.0"
 
 func main() {
 	cfg, err := config.Load()
@@ -23,39 +22,17 @@ func main() {
 	}
 
 	a := app.New()
-	win := a.NewWindow("GTA V Enhanced Mod Manager")
+	win := a.NewWindow("GTA V Enhanced Mod Manager " + version)
 
 	appUI := ui.NewApp(win, cfg)
 	win.SetContent(appUI.Build())
-	win.Resize(fyne.NewSize(700, 500))
+	win.Resize(fyne.NewSize(760, 560))
 
-	// First-run scan (SPEC.md §4.1): only runs if a game dir is already set
-	// and there's at least a chance of finding something new.
-	if cfg.GameDir != "" {
-		found, err := scanner.FindUnmanaged(cfg.GameDir, cfg.Rules, cfg.Mods)
-		if err != nil {
-			log.Printf("scan on startup failed (non-fatal): %v", err)
-		} else if len(found) > 0 {
-			cfg.Mods = append(cfg.Mods, found...)
-			if err := config.Save(cfg); err != nil {
-				log.Printf("failed saving newly scanned mods: %v", err)
-			}
-			appUI.Refresh()
-			dialog.ShowInformation(
-				"Imported existing mods",
-				modsSummary(found),
-				win,
-			)
-		}
-	}
+	// First-run work: auto-detect the game folder if it isn't set, otherwise
+	// rescan the known folder for mods added outside the app since last launch
+	// (SPEC.md §4.1). Dialogs opened here are queued by Fyne and shown once the
+	// event loop starts.
+	appUI.QueueFirstRun()
 
 	win.ShowAndRun()
-}
-
-func modsSummary(found []model.Mod) string {
-	names := make([]string, len(found))
-	for i, m := range found {
-		names[i] = m.Name
-	}
-	return "Found and imported:\n" + strings.Join(names, "\n")
 }

@@ -6,8 +6,8 @@ package profiles
 import (
 	"fmt"
 
-	"github.com/user/gta-mod-manager/internal/model"
-	"github.com/user/gta-mod-manager/internal/toggler"
+	"github.com/caiojohnston/gta-mod-manager/internal/model"
+	"github.com/caiojohnston/gta-mod-manager/internal/toggler"
 )
 
 // Switch moves the mod set in mods from its current enabled state to match

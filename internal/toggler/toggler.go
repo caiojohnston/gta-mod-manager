@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/user/gta-mod-manager/internal/model"
-	"github.com/user/gta-mod-manager/internal/procguard"
+	"github.com/caiojohnston/gta-mod-manager/internal/model"
+	"github.com/caiojohnston/gta-mod-manager/internal/procguard"
 )
 
 const disabledFolderName = "Disabled mods"
@@ -34,6 +35,7 @@ func Disable(gameDir, gameExeName string, mod *model.Mod) error {
 		if err := moveFile(src, dst); err != nil {
 			return fmt.Errorf("toggler: disabling %q, moving %q: %w", mod.Name, f.RelPath, err)
 		}
+		pruneEmptyDirs(gameDir, filepath.Dir(src))
 	}
 	mod.Enabled = false
 	return nil
@@ -57,11 +59,62 @@ func Enable(gameDir, gameExeName string, mod *model.Mod) error {
 		if err := moveFile(src, dst); err != nil {
 			return fmt.Errorf("toggler: enabling %q, moving %q: %w", mod.Name, f.RelPath, err)
 		}
+		pruneEmptyDirs(disabledRoot, filepath.Dir(src))
 	}
 	mod.Enabled = true
 	// Best-effort cleanup of the now-empty disabled folder for this mod.
 	_ = os.Remove(disabledRoot)
 	return nil
+}
+
+// Uninstall permanently deletes every file belonging to mod, whether the mod
+// is currently enabled (files live in gameDir) or disabled (files live in
+// "Disabled mods/<mod.Name>/"). This is the one operation SPEC.md allows to
+// delete rather than move — the caller must have confirmed with the user, and
+// is responsible for dropping the mod from the registry afterwards.
+func Uninstall(gameDir, gameExeName string, mod *model.Mod) error {
+	if running, err := procguard.IsGameRunning(gameExeName); err != nil {
+		return err
+	} else if running {
+		return &procguard.ErrGameRunning{ExeName: gameExeName}
+	}
+
+	base := gameDir
+	if !mod.Enabled {
+		base = filepath.Join(gameDir, disabledFolderName, mod.Name)
+	}
+	for _, f := range mod.Files {
+		p := filepath.Join(base, filepath.FromSlash(f.RelPath))
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("toggler: uninstalling %q, removing %q: %w", mod.Name, f.RelPath, err)
+		}
+		pruneEmptyDirs(base, filepath.Dir(p))
+	}
+	if !mod.Enabled {
+		_ = os.Remove(base) // best-effort: drop the now-empty per-mod disabled folder
+	}
+	return nil
+}
+
+// pruneEmptyDirs walks up from dir removing directories that are now empty,
+// stopping before it reaches (and never touching) stopAt. Used after moving or
+// deleting a mod's files so empty "scripts/Foo/" style folders don't pile up.
+func pruneEmptyDirs(stopAt, dir string) {
+	stopAt = filepath.Clean(stopAt)
+	for {
+		dir = filepath.Clean(dir)
+		if dir == stopAt || !strings.HasPrefix(dir, stopAt+string(filepath.Separator)) {
+			return
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil || len(entries) > 0 {
+			return
+		}
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
 }
 
 // moveFile moves src to dst, creating dst's parent directories as needed.

@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/caiojohnston/gta-mod-manager/internal/config"
+	"github.com/caiojohnston/gta-mod-manager/internal/installer"
+	"github.com/caiojohnston/gta-mod-manager/internal/model"
 	"github.com/google/uuid"
-	"github.com/user/gta-mod-manager/internal/config"
-	"github.com/user/gta-mod-manager/internal/installer"
-	"github.com/user/gta-mod-manager/internal/model"
 )
 
 // knownRootFiles are exact filenames in the game root that are never part of

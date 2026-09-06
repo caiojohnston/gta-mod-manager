@@ -21,6 +21,7 @@ gta-mod-manager/
 │   ├── SPEC.md
 │   └── PLAN.md
 ├── go.mod
+├── build.ps1                    # CGO build helper (finds MinGW, sets env)
 ├── main.go                     # entrypoint: builds Fyne app, wires screens
 ├── internal/
 │   ├── config/
@@ -29,21 +30,29 @@ gta-mod-manager/
 │   │   └── mod.go              # Mod, ModFile, Profile types shared everywhere
 │   ├── scanner/
 │   │   └── scanner.go          # first-run detection of pre-existing mods (§4.1)
+│   ├── gamedetect/
+│   │   ├── gamedetect.go       # validate + rank candidate GTA V folders (§4.1)
+│   │   ├── detect_windows.go   # registry / Steam VDF / Epic manifests probe
+│   │   └── detect_other.go     # no-op probe for non-Windows dev builds
 │   ├── installer/
 │   │   ├── installer.go        # zip/folder -> classified file list (§4.2)
 │   │   └── rules.go            # the destination rule table, user-overridable
 │   ├── toggler/
-│   │   └── toggler.go          # enable/disable, move to/from "Disabled mods/" (§4.3)
+│   │   └── toggler.go          # enable/disable/uninstall, move to/from "Disabled mods/" (§4.3)
 │   ├── profiles/
 │   │   └── profiles.go         # profile diff + switch logic (§4.4)
 │   ├── procguard/
 │   │   └── procguard.go        # "is the game running?" check (§G5)
 │   └── ui/
-│       ├── modlist.go          # main screen: mod list + toggles
-│       ├── install_wizard.go   # install review screen (§4.2 step 3)
-│       └── profiles_panel.go   # profile save/switch UI
+│       ├── modlist.go          # main screen: mod list + toggles + toolbar + status bar
+│       ├── actions.go          # shared App methods (detect, scan, toggle, bulk, clean, uninstall)
+│       ├── install_wizard.go   # install review screen with per-file destination override (§4.2 step 3)
+│       └── profiles_panel.go   # profile save / apply / delete UI
 └── README.md
 ```
+
+Every non-UI package has `*_test.go` coverage; `internal/ui` is tested headless
+via `fyne.io/fyne/v2/test`. `go test ./...` is green.
 
 ## Key decisions & rationale
 
@@ -74,14 +83,15 @@ gta-mod-manager/
 
 ## Build order (maps to tasks, one PR-sized chunk each)
 
-1. `model` + `config` — types and persistence, no UI yet, unit-testable in isolation.
-2. `procguard` — trivial, needed before anything that touches files.
-3. `installer` (zip → classified list, no copy yet) + `rules.go` defaults.
-4. `toggler` — enable/disable given a `Mod` already in the registry.
-5. `profiles` — diff-based switch on top of `toggler`.
-6. `scanner` — first-run import of pre-existing mods.
-7. `ui` — wire all of the above into Fyne screens, last because it depends on everything
-   else having a stable API.
+1. `model` + `config` — types and persistence, no UI yet, unit-testable in isolation. ✅
+2. `procguard` — trivial, needed before anything that touches files. ✅
+3. `installer` (zip → classified list, no copy yet) + `rules.go` defaults. ✅
+4. `toggler` — enable/disable/uninstall given a `Mod` already in the registry. ✅
+5. `profiles` — diff-based switch on top of `toggler`. ✅
+6. `scanner` — first-run import of pre-existing mods. ✅
+7. `gamedetect` — auto-locate the install folder (registry / Steam / Epic). ✅
+8. `ui` — wire all of the above into Fyne screens, last because it depends on everything
+   else having a stable API. ✅
 
 ## Open questions to revisit after v1
 - Conflict detection (two mods writing the same path) — currently silently last-write-wins.

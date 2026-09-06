@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/user/gta-mod-manager/internal/config"
-	"github.com/user/gta-mod-manager/internal/model"
+	"github.com/caiojohnston/gta-mod-manager/internal/config"
+	"github.com/caiojohnston/gta-mod-manager/internal/model"
 )
 
 // Classify applies the rule table to a single relative path (forward-slash

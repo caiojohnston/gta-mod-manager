@@ -1,72 +1,90 @@
 # GTA V Enhanced Mod Manager
 
-A native (Fyne) mod manager for GTA V Enhanced: install mods from a `.zip`/folder with a
-reviewable file-placement step (Vortex-style), and toggle installed mods on/off with
-saved profiles (like the reference toggle-only tool). Built following spec-driven
-development — see `docs/SPEC.md` for what it does and doesn't do, and `docs/PLAN.md` for
-the architecture.
+A native (Fyne) mod manager for GTA V Enhanced: install mods from a `.zip` or
+folder with a reviewable file-placement step (Vortex-style), and toggle
+installed mods on/off with saved profiles (like a toggle-only tool). Built
+spec-driven — see [`docs/SPEC.md`](docs/SPEC.md) for scope and
+[`docs/PLAN.md`](docs/PLAN.md) for the architecture.
 
-## Status
+## What works (v1)
 
-This is a **v1 skeleton**, built in one pass following the build order in `docs/PLAN.md`.
-What's here:
+- **Auto-detect the game folder** — reads the Rockstar/Steam/Epic registry keys,
+  Steam's `libraryfolders.vdf`, Epic's manifests, and common install paths, then
+  confirms each by looking for `GTA5_Enhanced.exe` (Legacy `GTA5.exe` is picked
+  up too, ranked lower). Manual folder picker as a fallback.
+- **Install from `.zip` or folder** with a review screen: every file is
+  classified by the rule table, and you can untick extras or override any file's
+  destination (Game root / `scripts/` / `mods/` / don't install) before anything
+  is copied.
+- **Toggle mods** on/off individually or in bulk (Enable all / Disable all).
+  Disabling moves a mod's tracked files to `Disabled mods/<name>/` inside the
+  game folder; enabling moves them back. Empty folders left behind are pruned.
+- **Launch Clean** — disables every enabled mod for one session and remembers
+  what to turn back on (survives an app restart); the button becomes
+  **Restore mods**.
+- **Profiles** — save the current on/off set under a name, apply one later
+  (only the difference is moved), or delete one.
+- **Uninstall** — the one action that deletes rather than moves a mod's files,
+  behind a confirmation.
+- **Safety**: refuses every file move while `GTA5_Enhanced.exe` is running;
+  never touches `.rpf` archives.
+- First-run scan imports mods already sitting in the folder (`.asi`,
+  `dinput8.dll`, `ScriptHookV.dll`, `scripts/`, `mods/`) so nothing is lost.
 
-- ✅ `internal/model`, `internal/config`, `internal/procguard`, `internal/installer`,
-  `internal/toggler`, `internal/profiles`, `internal/scanner` — all the core logic.
-  **These compile and pass `go vet` cleanly** (verified in the sandbox this was built in).
-- ✅ `internal/ui` + `main.go` — the Fyne screens, written against the packages above.
-  **Not build-verified** in the sandbox this was built in, because that sandbox's network
-  is locked down to a small allowlist that doesn't include `proxy.golang.org`,
-  `golang.org`, or `gopkg.in` — and Fyne's dependency tree reaches all three. On a normal
-  machine with unrestricted internet, `go mod tidy` resolves this in the usual way.
+Config + mod registry live at `%AppData%\GTAVGoModManager\config.json`.
 
-## Building (on your machine, with normal internet access)
+## Building (Windows)
 
+Fyne needs CGO and a C compiler. Install **MinGW-w64** once (e.g.
+`choco install mingw`), then:
+
+```powershell
+./build.ps1            # builds gta-mod-manager.exe
+./build.ps1 -Run       # build then launch
+./build.ps1 -Test      # go test ./...
 ```
-go mod tidy
-go build ./...
-```
 
-`go mod tidy` will download and pin the actual dependency versions (Fyne, its transitive
-deps, uuid, go-ps) into `go.sum`. The `go.mod` here lists direct requirements only; you
-don't need any of the GitHub-mirror workarounds that were needed to verify the logic
-packages in the build sandbox.
+`build.ps1` finds MinGW in the usual spots and sets `CGO_ENABLED=1` for you.
+Manual equivalent:
 
-To run it:
+```powershell
+$env:Path = "C:\msys64\mingw64\bin;" + $env:Path
+$env:CGO_ENABLED = "1"
+go build -o gta-mod-manager.exe .
 ```
-go run .
-```
-
-To produce a Windows `.exe` (the only real target, since that's what GTA V Enhanced runs
-on for PC modding):
-```
-GOOS=windows GOARCH=amd64 go build -o gta-mod-manager.exe .
-```
-(Building on Windows directly, or via `fyne-cross`, is more reliable for the CGO/OpenGL
-bindings Fyne needs than cross-compiling from Linux — worth trying a native Windows build
-first if the cross-compile gives you linker trouble.)
 
 ## First run
 
-1. Launch the app, click **Set game folder...**, point it at your GTA V Enhanced install.
-2. If you already had mods installed manually, they should show up automatically (scanned
-   via the same heuristic as most toggle tools: `.asi` files, `dinput8.dll`,
-   `ScriptHookV.dll`, `scripts/`, `mods/`).
-3. **Install mod...** to add something new from a `.zip`; you'll get a review screen
-   before anything is copied.
-4. Toggle mods with the checkboxes in the main list; use **Profiles...** to save/switch
-   named sets.
+1. Launch the app. It tries to find GTA V automatically — confirm the folder it
+   found, or pick between several, or use **Set folder manually...**.
+2. Mods already installed by hand are imported and shown in the list.
+3. **Install mod...** to add one from a `.zip` (or an extracted folder); review
+   the file placement, then confirm.
+4. Toggle with the checkboxes; **Profiles...** to save/switch sets;
+   **Launch Clean** before playing GTA Online.
 
-## What's next (see docs/SPEC.md §5 for the full stretch-goal list)
+## Tests
 
-- `.rar`/`.7z` support (v1 only handles `.zip` and plain folders).
+Core logic (everything except the Fyne UI) is covered by unit tests:
+
+```powershell
+go test ./internal/...
+```
+
+`internal/gamedetect` also has an opt-in real-machine probe:
+`GAMEDETECT_MANUAL=1 go test ./internal/gamedetect -run Manual -v`.
+
+## Not in v1
+
+- `.rar` / `.7z` archives (only `.zip` and plain folders).
 - ScriptHookV version-mismatch warning.
-- Conflict detection when two mods write the same destination path.
+- Conflict detection when two mods write the same destination path
+  (currently last-write-wins, silently).
+- GTA Online firewall / offline-mode automation.
 
 ## Safety notes
 
-- This only manages loose files (`.asi`, `.dll`, `.lua`, `scripts/`, `mods/`). It never
-  touches `.rpf` archives — use OpenRPF for that.
-- It refuses to move files while the game process is running (`procguard`).
-- Installing copies files (originals untouched); toggling moves files (nothing is ever
-  deleted without an explicit uninstall action, which isn't wired up yet in this v1 pass).
+- Manages only loose files (`.asi`, `.dll`, `.lua`, `scripts/`, `mods/`). It
+  never edits `.rpf` archives — use OpenRPF for that.
+- Installing copies files (originals untouched). Toggling moves files. Only
+  **Uninstall** deletes, and it asks first.

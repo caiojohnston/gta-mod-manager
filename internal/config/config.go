@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/user/gta-mod-manager/internal/model"
+	"github.com/caiojohnston/gta-mod-manager/internal/model"
 )
 
 // CurrentSchemaVersion must be bumped whenever the on-disk shape changes, and
@@ -32,6 +32,12 @@ type Config struct {
 	Mods          []model.Mod     `json:"mods"`
 	Profiles      []model.Profile `json:"profiles"`
 	Rules         []RulePattern   `json:"rules"`
+	// PreCleanModIDs holds the mod IDs that were enabled before the user hit
+	// "Launch Clean" (SPEC.md §4.3). Non-empty means a clean run is active and
+	// the UI should offer "Restore mods"; it survives a restart so a crash
+	// mid-session can't strand the user with everything disabled and no memory
+	// of what to turn back on.
+	PreCleanModIDs []string `json:"preCleanModIds,omitempty"`
 }
 
 // DefaultRules mirrors SPEC.md §4.2's default table. Stored in config (not
@@ -97,7 +103,28 @@ func Load() (*Config, error) {
 	}
 	// Schema migrations would go here, keyed on cfg.SchemaVersion, before
 	// returning. v1 has nothing to migrate from yet.
+	backfillDefaults(&cfg)
 	return &cfg, nil
+}
+
+// backfillDefaults fills in fields that a hand-edited or partially-written
+// config might be missing, so the rest of the app never has to nil-check them.
+func backfillDefaults(cfg *Config) {
+	if cfg.SchemaVersion == 0 {
+		cfg.SchemaVersion = CurrentSchemaVersion
+	}
+	if cfg.GameExeName == "" {
+		cfg.GameExeName = defaultConfig().GameExeName
+	}
+	if len(cfg.Rules) == 0 {
+		cfg.Rules = DefaultRules()
+	}
+	if cfg.Mods == nil {
+		cfg.Mods = []model.Mod{}
+	}
+	if cfg.Profiles == nil {
+		cfg.Profiles = []model.Profile{}
+	}
 }
 
 // Save writes the config atomically-ish (write temp, rename) so a crash

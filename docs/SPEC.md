@@ -112,10 +112,15 @@ Given a `.zip` or folder:
 - Conflict detection when two mods claim the same destination path.
 
 ## 6. Acceptance criteria for v1
-- [ ] Can point the app at a real GTA V Enhanced folder and see existing mods imported.
-- [ ] Can install a `.zip` containing an `.asi` mod and a folder of `scripts/` and end up
+- [x] Can point the app at a real GTA V Enhanced folder and see existing mods imported.
+      (Plus: the folder is auto-detected on first run — see §4.1.)
+- [x] Can install a `.zip` containing an `.asi` mod and a folder of `scripts/` and end up
       with correct files in the correct places, with the mod tracked as one unit.
-- [ ] Can toggle that mod off and confirm the files are gone from the live game folder
+      (Covered by `installer.TestInspectAndCommitZip`.)
+- [x] Can toggle that mod off and confirm the files are gone from the live game folder
       (moved to `Disabled mods/`), then toggle it back on.
-- [ ] Can create two profiles and switch between them without manual file moves.
-- [ ] App refuses to act while the game process is running.
+      (Covered by `toggler.TestDisableEnableRoundtrip` and `ui.TestToggleMovesFilesAndPersists`.)
+- [x] Can create two profiles and switch between them without manual file moves.
+      (Covered by `profiles.TestSwitchMovesOnlyDelta`.)
+- [x] App refuses to act while the game process is running.
+      (Covered by `toggler.TestGuardBlocksWhenGameRunning`.)
