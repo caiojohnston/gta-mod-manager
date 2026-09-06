@@ -76,6 +76,8 @@ func TestAutoApprove(t *testing.T) {
 		{"pack/mods/update/x.rpf", model.KindMods, true},     // ditto, nested
 		{"pack/onigiri/common/x.dat", model.KindMods, false}, // heuristic placement: needs review
 		{"pack/some.rpf", model.KindMods, false},
+		{"a80/dlc.rpf", model.KindMods, true}, // add-on dlcpack: one clear home
+		{"vremastered/dlc.rpf", model.KindMods, true},
 		{"whatever", model.KindCustom, false},
 		{"readme.txt", model.KindOther, false},
 	}

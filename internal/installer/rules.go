@@ -117,7 +117,11 @@ func AutoApprove(relPath string, kind model.FileKind) bool {
 		return true
 	case model.KindMods:
 		lower := strings.ToLower(relPath)
-		return strings.HasPrefix(lower, "mods/") || strings.Contains(lower, "/mods/")
+		if strings.HasPrefix(lower, "mods/") || strings.Contains(lower, "/mods/") {
+			return true
+		}
+		// An add-on dlc.rpf has one unambiguous home; pre-tick it.
+		return strings.HasSuffix(lower, "/dlc.rpf") && dlcPackName(relPath) != ""
 	default:
 		return false
 	}

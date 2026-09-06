@@ -36,7 +36,11 @@ func Inspect(archiveOrFolder string, rules []config.RulePattern) (stagingDir str
 	}
 
 	if info.IsDir() {
-		files, err = classifyDir(archiveOrFolder, archiveOrFolder, rules)
+		// Keep the picked folder's own name in RelInArchive (base is its
+		// parent), so a mod distributed as a bare "a80/" or "vremastered/"
+		// folder still carries the name the dlcpack rules need. A shared
+		// wrapper dir is stripped later for display / custom-path guesses.
+		files, err = classifyDir(archiveOrFolder, filepath.Dir(archiveOrFolder), rules)
 		return archiveOrFolder, files, func() {}, err
 	}
 
