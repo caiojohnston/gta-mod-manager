@@ -14,6 +14,7 @@ import (
 	"github.com/caiojohnston/gta-mod-manager/internal/config"
 	"github.com/caiojohnston/gta-mod-manager/internal/installer"
 	"github.com/caiojohnston/gta-mod-manager/internal/model"
+	"github.com/caiojohnston/gta-mod-manager/internal/oiv"
 )
 
 // Destination choices offered per file in the review screen. "Auto" keeps
@@ -75,7 +76,8 @@ func ShowInstallWizard(a *App) {
 }
 
 // rejectUnsupported shows a helper dialog and returns true when path is an
-// archive kind this app can't open (.rar/.7z) or an OpenIV package (.oiv).
+// archive kind this app can't open (.rar/.7z). .oiv is handled natively, not
+// rejected.
 func (a *App) rejectUnsupported(p string) bool {
 	switch strings.ToLower(path.Ext(p)) {
 	case ".rar", ".7z":
@@ -83,15 +85,16 @@ func (a *App) rejectUnsupported(p string) bool {
 			"Only .zip archives and folders are supported.\n\nExtract this with 7-Zip or WinRAR, then use \"Install mod... → From a folder\".",
 			a.Win)
 		return true
-	case ".oiv":
-		a.showOIVHelp()
-		return true
 	}
 	return false
 }
 
 func (a *App) startInstall(archiveOrFolder string) {
 	if a.rejectUnsupported(archiveOrFolder) {
+		return
+	}
+	if strings.EqualFold(path.Ext(archiveOrFolder), ".oiv") {
+		a.startOIVInstall(archiveOrFolder)
 		return
 	}
 
@@ -102,8 +105,8 @@ func (a *App) startInstall(archiveOrFolder string) {
 	}
 	_ = staging
 
-	// A package that is only .oiv content can't be installed here — it needs
-	// OpenIV's Package Installer (RPF writes + XML merges this tool doesn't do).
+	// A .zip whose only real payload is a nested .oiv: point the user at the
+	// .oiv directly (we install those, but not the double-wrapped case yet).
 	oiv, real := 0, 0
 	for _, f := range files {
 		ext := strings.ToLower(path.Ext(f.RelInArchive))
@@ -115,21 +118,73 @@ func (a *App) startInstall(archiveOrFolder string) {
 	}
 	if oiv > 0 && real == 0 {
 		cleanup()
-		a.showOIVHelp()
+		dialog.ShowInformation("It's an OpenIV package",
+			"This .zip contains a .oiv package. Extract the .oiv, then use\n"+
+				"\"Install mod... → From a .zip\" and pick the .oiv itself.",
+			a.Win)
 		return
 	}
 
 	a.showReviewList(archiveOrFolder, files, cleanup)
 }
 
-func (a *App) showOIVHelp() {
-	dialog.ShowInformation("OpenIV package (.oiv)",
-		"This mod is an OpenIV package. Install it with OpenIV, not this app:\n\n"+
-			"  1. Open OpenIV → pick your GTA V folder\n"+
-			"  2. Tools → Package Installer\n"+
-			"  3. Choose the .oiv file → Install → \"mods\" folder\n\n"+
-			"This app manages loose files (.asi/.dll/.rpf), not .oiv packages.",
-		a.Win)
+// startOIVInstall installs the ADD operations of an .oiv package as loose files
+// under mods/ (OpenRPF reads them). XML-fragment merges / deletes it can't do
+// are listed for the user; XML .ymt/.meta still trigger the compile warning.
+func (a *App) startOIVInstall(oivPath string) {
+	pkg, err := oiv.Read(oivPath)
+	if err != nil {
+		dialog.ShowError(err, a.Win)
+		return
+	}
+	if len(pkg.Adds) == 0 {
+		dialog.ShowInformation("Needs OpenIV",
+			"This .oiv has no plain file-copy steps — it only does RPF/XML edits\n"+
+				"this app can't perform. Use OpenIV → Tools → Package Installer.",
+			a.Win)
+		return
+	}
+	if err := pkg.Extract(); err != nil {
+		dialog.ShowError(fmt.Errorf("reading .oiv contents: %w", err), a.Win)
+		return
+	}
+
+	files := make([]installer.ProposedFile, 0, len(pkg.Adds))
+	for _, op := range pkg.Adds {
+		files = append(files, installer.ProposedFile{
+			SourcePath:   op.ExtractedPath,
+			RelInArchive: op.SourceName,
+			Kind:         model.KindCustom,
+			Dest:         op.ModsRelPath,
+			Approved:     true,
+		})
+	}
+
+	show := func() {
+		name := pkg.Name
+		if name == "" {
+			name = defaultModName(oivPath)
+		}
+		a.showReviewList(name, files, pkg.Close)
+	}
+
+	if len(pkg.Unsupported) > 0 {
+		dialog.ShowCustomConfirm("Some steps need OpenIV", "Install the rest", "Cancel",
+			widget.NewLabel(fmt.Sprintf(
+				"%d file(s) will be installed as loose overrides.\n\n"+
+					"%d step(s) can't be done here (they edit inside RPFs):\n  %s\n\n"+
+					"For full parity run the .oiv through OpenIV instead.",
+				len(files), len(pkg.Unsupported), strings.Join(pkg.Unsupported, "\n  "))),
+			func(ok bool) {
+				if ok {
+					show()
+				} else {
+					pkg.Close()
+				}
+			}, a.Win)
+		return
+	}
+	show()
 }
 
 // review holds the mutable state of one install-review screen.

@@ -36,6 +36,12 @@ on what to do instead (extract first / use OpenIV).
   left unticked for you to confirm the exact target. They load in-game only with
   **OpenRPF** (or OpenIV) installed in the game folder — this tool places the
   files, OpenRPF makes the game read them.
+- **`.oiv` packages (partial, native)** — an OpenIV package whose `assembly.xml`
+  only *adds* files is installed by placing each file as a loose override under
+  `mods/` (OpenRPF then merges it). Packages that also do XML-fragment merges,
+  deletes, or need resource compilation (XML `.ymt` → binary) are only partially
+  handled: those steps are listed and you finish them in OpenIV. Full RPF write
+  + resource compilation is OpenIV's job, not this tool's.
 - **Toggle mods** on/off individually or in bulk (Enable all / Disable all).
   Disabling moves a mod's tracked files to `Disabled mods/<name>/` inside the
   game folder; enabling moves them back. Empty folders left behind are pruned.

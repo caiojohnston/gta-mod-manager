@@ -8,13 +8,13 @@ import (
 )
 
 // metaExts are extensions whose game-side form is a compiled binary resource
-// even though mod authors often ship them as editable XML (CodeWalker converts
-// on import). Dropping the raw XML in place does nothing — the game only reads
-// the binary. .xml itself is excluded: dlclist.xml / content.xml etc. really
-// are plain text the game parses.
+// even when a mod author ships them as editable XML — dropping the raw XML in
+// place does nothing, the game only reads the binary, and converting needs
+// CodeWalker. Excluded on purpose: .meta and .xml — the RAGE parser reads
+// those as text at load time (weapons.meta, handling.meta, dlclist.xml, …), so
+// loose XML there is fine.
 var metaExts = map[string]bool{
-	".ymt": true, ".meta": true, ".pso": true,
-	".ymap": true, ".ytyp": true, ".ymf": true,
+	".ymt": true, ".pso": true, ".ymap": true, ".ytyp": true, ".ymf": true,
 }
 
 // NeedsCompile reports whether f is an uncompiled XML meta file: a metaExts
