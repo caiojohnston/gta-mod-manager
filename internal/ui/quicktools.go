@@ -29,6 +29,9 @@ func (a *App) ShowInstallBaseTool(preset installer.Preset, directURL string) {
 	}
 
 	runPreset := func(archive string) {
+		if a.rejectUnsupported(archive) {
+			return
+		}
 		staging, files, cleanup, err := installer.Inspect(archive, a.Cfg.Rules)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("couldn't read %q: %w", archive, err), a.Win)

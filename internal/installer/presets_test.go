@@ -54,3 +54,15 @@ func TestOpenRPFPreset(t *testing.T) {
 		t.Fatalf("OpenRPF preset should approve only OpenIV.asi, got %v", got)
 	}
 }
+
+func TestOpenRPFPresetAcceptsOpenRPFAsi(t *testing.T) {
+	files := []ProposedFile{
+		{RelInArchive: "OpenRPF.asi"},
+		{RelInArchive: "readme.txt"},
+	}
+	OpenRPFPreset().Apply(files)
+	got := approvedDests(files)
+	if len(got) != 1 || got["OpenRPF.asi"] != "OpenRPF.asi" {
+		t.Fatalf("preset should approve OpenRPF.asi as-is, got %v", got)
+	}
+}

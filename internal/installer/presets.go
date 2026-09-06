@@ -65,9 +65,11 @@ func OpenRPFPreset() Preset {
 		Apply: func(files []ProposedFile) {
 			for i := range files {
 				base := strings.ToLower(path.Base(files[i].RelInArchive))
-				if base == "openiv.asi" {
+				// OpenRPF ships as OpenIV.asi (drop-in name) or OpenRPF.asi
+				// depending on the build; keep whichever the archive has.
+				if base == "openiv.asi" || base == "openrpf.asi" {
 					files[i].Kind = model.KindRoot
-					files[i].Dest = "OpenIV.asi"
+					files[i].Dest = path.Base(files[i].RelInArchive)
 					files[i].Approved = true
 				} else {
 					files[i].Approved = false

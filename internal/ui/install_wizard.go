@@ -74,14 +74,62 @@ func ShowInstallWizard(a *App) {
 	choose.Show()
 }
 
+// rejectUnsupported shows a helper dialog and returns true when path is an
+// archive kind this app can't open (.rar/.7z) or an OpenIV package (.oiv).
+func (a *App) rejectUnsupported(p string) bool {
+	switch strings.ToLower(path.Ext(p)) {
+	case ".rar", ".7z":
+		dialog.ShowInformation("Extract it first",
+			"Only .zip archives and folders are supported.\n\nExtract this with 7-Zip or WinRAR, then use \"Install mod... → From a folder\".",
+			a.Win)
+		return true
+	case ".oiv":
+		a.showOIVHelp()
+		return true
+	}
+	return false
+}
+
 func (a *App) startInstall(archiveOrFolder string) {
+	if a.rejectUnsupported(archiveOrFolder) {
+		return
+	}
+
 	staging, files, cleanup, err := installer.Inspect(archiveOrFolder, a.Cfg.Rules)
 	if err != nil {
 		dialog.ShowError(fmt.Errorf("couldn't read %q: %w", archiveOrFolder, err), a.Win)
 		return
 	}
 	_ = staging
+
+	// A package that is only .oiv content can't be installed here — it needs
+	// OpenIV's Package Installer (RPF writes + XML merges this tool doesn't do).
+	oiv, real := 0, 0
+	for _, f := range files {
+		ext := strings.ToLower(path.Ext(f.RelInArchive))
+		if ext == ".oiv" {
+			oiv++
+		} else if !junkExts[ext] {
+			real++
+		}
+	}
+	if oiv > 0 && real == 0 {
+		cleanup()
+		a.showOIVHelp()
+		return
+	}
+
 	a.showReviewList(archiveOrFolder, files, cleanup)
+}
+
+func (a *App) showOIVHelp() {
+	dialog.ShowInformation("OpenIV package (.oiv)",
+		"This mod is an OpenIV package. Install it with OpenIV, not this app:\n\n"+
+			"  1. Open OpenIV → pick your GTA V folder\n"+
+			"  2. Tools → Package Installer\n"+
+			"  3. Choose the .oiv file → Install → \"mods\" folder\n\n"+
+			"This app manages loose files (.asi/.dll/.rpf), not .oiv packages.",
+		a.Win)
 }
 
 // review holds the mutable state of one install-review screen.
