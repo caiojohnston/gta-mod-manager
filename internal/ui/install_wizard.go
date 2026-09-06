@@ -83,40 +83,7 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 	for i := range files {
 		selection[i] = destAuto
 	}
-
-	var list *widget.List
-	list = widget.NewList(
-		func() int { return len(files) },
-		func() fyne.CanvasObject {
-			check := widget.NewCheck("", nil)
-			sel := widget.NewSelect(destOptions, nil)
-			label := widget.NewLabel("path")
-			return container.NewBorder(nil, nil, check, sel, label)
-		},
-		func(i widget.ListItemID, obj fyne.CanvasObject) {
-			f := &files[i]
-			row := obj.(*fyne.Container)
-			check := row.Objects[0].(*widget.Check)
-			label := row.Objects[1].(*widget.Label)
-			sel := row.Objects[2].(*widget.Select)
-
-			label.SetText(fmt.Sprintf("%s  →  %s", f.RelInArchive, destSummary(f)))
-
-			check.OnChanged = nil
-			check.SetChecked(f.Approved)
-			idx := i
-			check.OnChanged = func(v bool) { files[idx].Approved = v }
-
-			sel.OnChanged = nil
-			sel.SetSelected(selection[i])
-			sel.OnChanged = func(choice string) {
-				selection[idx] = choice
-				applyDestChoice(&files[idx], a.Cfg.Rules, choice)
-				label.SetText(fmt.Sprintf("%s  →  %s", files[idx].RelInArchive, destSummary(&files[idx])))
-				list.Refresh()
-			}
-		},
-	)
+	list := newReviewList(a.Cfg.Rules, files, selection)
 
 	nameEntry := widget.NewEntry()
 	nameEntry.SetText(defaultModName(source))
@@ -166,6 +133,49 @@ func (a *App) showReviewList(source string, files []installer.ProposedFile, clea
 	d.SetOnClosed(cleanupOnce)
 	d.Resize(fyne.NewSize(680, 520))
 	d.Show()
+}
+
+// newReviewList builds the per-file review list for the install wizard. It's a
+// standalone function (not an inline closure) so a headless test can render a
+// row and catch template/index mismatches.
+func newReviewList(rules []config.RulePattern, files []installer.ProposedFile, selection []string) *widget.List {
+	var list *widget.List
+	list = widget.NewList(
+		func() int { return len(files) },
+		func() fyne.CanvasObject {
+			check := widget.NewCheck("", nil)
+			sel := widget.NewSelect(destOptions, nil)
+			label := widget.NewLabel("path")
+			// NewBorder lists the center object first in .Objects, then each
+			// non-nil border in top/bottom/left/right order — so this row is
+			// [label, check, sel]. Keep the update func's indices in sync.
+			return container.NewBorder(nil, nil, check, sel, label)
+		},
+		func(i widget.ListItemID, obj fyne.CanvasObject) {
+			f := &files[i]
+			row := obj.(*fyne.Container)
+			label := row.Objects[0].(*widget.Label)
+			check := row.Objects[1].(*widget.Check)
+			sel := row.Objects[2].(*widget.Select)
+
+			label.SetText(fmt.Sprintf("%s  →  %s", f.RelInArchive, destSummary(f)))
+
+			check.OnChanged = nil
+			check.SetChecked(f.Approved)
+			idx := i
+			check.OnChanged = func(v bool) { files[idx].Approved = v }
+
+			sel.OnChanged = nil
+			sel.SetSelected(selection[i])
+			sel.OnChanged = func(choice string) {
+				selection[idx] = choice
+				applyDestChoice(&files[idx], rules, choice)
+				label.SetText(fmt.Sprintf("%s  →  %s", files[idx].RelInArchive, destSummary(&files[idx])))
+				list.Refresh()
+			}
+		},
+	)
+	return list
 }
 
 func destSummary(f *installer.ProposedFile) string {

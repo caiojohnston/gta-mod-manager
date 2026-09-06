@@ -21,7 +21,7 @@ func main() {
 		log.Fatalf("loading config: %v", err)
 	}
 
-	a := app.New()
+	a := app.NewWithID("com.caiojohnston.gtamodmanager")
 	win := a.NewWindow("GTA V Enhanced Mod Manager " + version)
 
 	appUI := ui.NewApp(win, cfg)

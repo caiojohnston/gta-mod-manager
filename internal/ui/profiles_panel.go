@@ -52,14 +52,35 @@ func ShowProfilesPanel(a *App) {
 		profileList.Refresh()
 	})
 
-	profileList = widget.NewList(
+	profileList = a.newProfileList(func() { profileList.Refresh() })
+
+	hint := widget.NewLabelWithStyle(
+		"A profile is a saved on/off set. Applying one moves only what differs.",
+		fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+
+	content := container.NewBorder(
+		container.NewVBox(container.NewBorder(nil, nil, nil, saveBtn, nameEntry), hint, widget.NewSeparator()),
+		nil, nil, nil, profileList)
+	d = dialog.NewCustom("Profiles", "Close", content, a.Win)
+	d.Resize(fyne.NewSize(460, 440))
+	d.Show()
+}
+
+// newProfileList builds the saved-profiles list (apply / delete per row).
+// Standalone so a headless test can render a row. afterMutate is called after a
+// delete so the caller can refresh the list widget.
+func (a *App) newProfileList(afterMutate func()) *widget.List {
+	return widget.NewList(
 		func() int { return len(a.Cfg.Profiles) },
 		func() fyne.CanvasObject {
 			apply := widget.NewButtonWithIcon("apply", theme.ConfirmIcon(), nil)
 			del := widget.NewButtonWithIcon("", theme.DeleteIcon(), nil)
 			del.Importance = widget.LowImportance
 			name := widget.NewLabel("profile")
-			return container.NewBorder(nil, nil, name, container.NewHBox(apply, del), widget.NewLabel(""))
+			// NewBorder puts the center object first in .Objects, then each
+			// non-nil border in top/bottom/left/right order — so this row is
+			// [name, buttonBox]. Keep that in sync with the update func below.
+			return container.NewBorder(nil, nil, nil, container.NewHBox(apply, del), name)
 		},
 		func(i widget.ListItemID, obj fyne.CanvasObject) {
 			p := a.Cfg.Profiles[i]
@@ -98,20 +119,11 @@ func ShowProfilesPanel(a *App) {
 						}
 						a.Cfg.Profiles = append(a.Cfg.Profiles[:idx], a.Cfg.Profiles[idx+1:]...)
 						a.persist()
-						profileList.Refresh()
+						if afterMutate != nil {
+							afterMutate()
+						}
 					}, a.Win)
 			}
 		},
 	)
-
-	hint := widget.NewLabelWithStyle(
-		"A profile is a saved on/off set. Applying one moves only what differs.",
-		fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
-
-	content := container.NewBorder(
-		container.NewVBox(container.NewBorder(nil, nil, nil, saveBtn, nameEntry), hint, widget.NewSeparator()),
-		nil, nil, nil, profileList)
-	d = dialog.NewCustom("Profiles", "Close", content, a.Win)
-	d.Resize(fyne.NewSize(460, 440))
-	d.Show()
 }

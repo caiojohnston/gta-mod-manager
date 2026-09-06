@@ -5,9 +5,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/widget"
 
 	"github.com/caiojohnston/gta-mod-manager/internal/config"
+	"github.com/caiojohnston/gta-mod-manager/internal/installer"
 	"github.com/caiojohnston/gta-mod-manager/internal/model"
 	"github.com/caiojohnston/gta-mod-manager/internal/procguard"
 )
@@ -64,6 +68,65 @@ func TestBuildRendersRows(t *testing.T) {
 	}
 	if a.emptyHint == nil || a.emptyHint.Visible() {
 		t.Error("empty hint should be hidden when mods exist")
+	}
+}
+
+// renderRow drives a widget.List's template + update funcs the way Fyne's
+// renderer does, so a template/index mismatch panics here instead of at
+// runtime when the user opens the screen.
+func renderRow(t *testing.T, l *widget.List, id int) fyne.CanvasObject {
+	t.Helper()
+	obj := l.CreateItem()
+	l.UpdateItem(id, obj)
+	return obj
+}
+
+func TestModListRowRenders(t *testing.T) {
+	a, _ := newTestApp(t)
+	row := renderRow(t, a.list, 0).(*fyne.Container)
+	check := row.Objects[1].(*widget.Check)
+	if !check.Checked {
+		t.Error("row 0 (Alpha, enabled) should render a checked box")
+	}
+}
+
+func TestReviewListRowRenders(t *testing.T) {
+	files := []installer.ProposedFile{
+		{RelInArchive: "ScriptHookV.dll", Kind: model.KindRoot, Dest: "ScriptHookV.dll", Approved: true},
+		{RelInArchive: "readme.txt", Kind: model.KindOther},
+	}
+	sel := []string{destAuto, destAuto}
+	l := newReviewList(config.DefaultRules(), files, sel)
+	for i := range files {
+		row := renderRow(t, l, i).(*fyne.Container)
+		_ = row.Objects[0].(*widget.Label)
+		_ = row.Objects[1].(*widget.Check)
+		_ = row.Objects[2].(*widget.Select)
+	}
+}
+
+func TestProfileListRowRenders(t *testing.T) {
+	a, _ := newTestApp(t)
+	a.Cfg.Profiles = []model.Profile{{Name: "Graphics", EnabledModIDs: []string{"a"}}}
+	l := a.newProfileList(nil)
+	row := renderRow(t, l, 0).(*fyne.Container)
+	name := row.Objects[0].(*widget.Label)
+	if name.Text == "" {
+		t.Error("profile row should show a name")
+	}
+	_ = row.Objects[1].(*fyne.Container) // the apply/delete button box
+}
+
+// TestBorderObjectsOrder pins the container.NewBorder(.Objects) ordering the
+// list update funcs rely on: center object(s) first, then each non-nil border
+// in top, bottom, left, right order.
+func TestBorderObjectsOrder(t *testing.T) {
+	center := widget.NewLabel("C")
+	left := widget.NewCheck("", nil)
+	right := widget.NewSelect(nil, nil)
+	c := container.NewBorder(nil, nil, left, right, center)
+	if len(c.Objects) != 3 || c.Objects[0] != center || c.Objects[1] != left || c.Objects[2] != right {
+		t.Fatalf("NewBorder .Objects order changed: got %#v", c.Objects)
 	}
 }
 
