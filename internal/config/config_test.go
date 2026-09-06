@@ -61,6 +61,39 @@ func TestSaveLoadRoundtrip(t *testing.T) {
 	}
 }
 
+func TestMergeMissingDefaultRules(t *testing.T) {
+	// An old config with the original 7-rule table (no *.rpf / dlcpacks/).
+	old := []RulePattern{
+		{Match: "dinput8.dll", Destination: model.KindRoot},
+		{Match: "*.asi", Destination: model.KindRoot},
+		{Match: "scripts/", Destination: model.KindScripts},
+		{Match: "mods/", Destination: model.KindMods},
+		{Match: "*.dll", Destination: model.KindScripts},
+		{Match: "*.lua", Destination: model.KindScripts},
+		{Match: "MyCustom.xyz", Destination: model.KindRoot}, // user's own
+	}
+	got := mergeMissingDefaultRules(old)
+
+	has := func(m string) bool {
+		for _, r := range got {
+			if r.Match == m {
+				return true
+			}
+		}
+		return false
+	}
+	if !has("*.rpf") || !has("dlcpacks/") || !has("common/") {
+		t.Errorf("missing default patterns not backfilled: %+v", got)
+	}
+	if !has("MyCustom.xyz") {
+		t.Error("user's own rule was dropped")
+	}
+	// idempotent
+	if len(mergeMissingDefaultRules(got)) != len(got) {
+		t.Error("second merge changed the set")
+	}
+}
+
 func TestBackfillDefaults(t *testing.T) {
 	dir := redirectConfigDir(t)
 

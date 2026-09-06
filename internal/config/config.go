@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/caiojohnston/gta-mod-manager/internal/model"
 )
@@ -126,7 +127,11 @@ func Load() (*Config, error) {
 	}
 	// Schema migrations would go here, keyed on cfg.SchemaVersion, before
 	// returning. v1 has nothing to migrate from yet.
+	before := len(cfg.Rules)
 	backfillDefaults(&cfg)
+	if len(cfg.Rules) != before {
+		_ = Save(&cfg) // persist backfilled rules so it's a one-time cost
+	}
 	return &cfg, nil
 }
 
@@ -141,6 +146,8 @@ func backfillDefaults(cfg *Config) {
 	}
 	if len(cfg.Rules) == 0 {
 		cfg.Rules = DefaultRules()
+	} else {
+		cfg.Rules = mergeMissingDefaultRules(cfg.Rules)
 	}
 	if cfg.Mods == nil {
 		cfg.Mods = []model.Mod{}
@@ -148,6 +155,23 @@ func backfillDefaults(cfg *Config) {
 	if cfg.Profiles == nil {
 		cfg.Profiles = []model.Profile{}
 	}
+}
+
+// mergeMissingDefaultRules appends any DefaultRules() pattern whose Match isn't
+// already in rules. Config files written by older versions lack the newer
+// content-mod patterns (*.rpf, dlcpacks/, …); this backfills them without
+// touching the user's own edits or ordering.
+func mergeMissingDefaultRules(rules []RulePattern) []RulePattern {
+	have := make(map[string]bool, len(rules))
+	for _, r := range rules {
+		have[strings.ToLower(r.Match)] = true
+	}
+	for _, d := range DefaultRules() {
+		if !have[strings.ToLower(d.Match)] {
+			rules = append(rules, d)
+		}
+	}
+	return rules
 }
 
 // Save writes the config atomically-ish (write temp, rename) so a crash
