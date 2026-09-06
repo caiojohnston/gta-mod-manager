@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -241,10 +242,22 @@ func (a *App) restoreSpecific(ids []string) {
 
 // uninstallMod deletes a mod's files (after confirmation) and drops it from
 // the registry. This is the only path that removes files rather than moving
-// them (SPEC.md §G5 / §4.3).
+// them (SPEC.md §G5 / §4.3). Files that another tracked mod also claims are
+// left on disk so uninstalling one of two overlapping entries can't break the
+// other.
 func (a *App) uninstallMod(mod *model.Mod) {
-	dialog.ShowConfirm("Uninstall "+mod.Name+"?",
-		fmt.Sprintf("This permanently deletes %d file(s) this mod placed. It can't be undone.", len(mod.Files)),
+	keep := a.pathsClaimedByOthers(mod.ID)
+	shared := 0
+	for _, f := range mod.Files {
+		if keep[filepath.ToSlash(f.RelPath)] {
+			shared++
+		}
+	}
+	msg := fmt.Sprintf("This permanently deletes %d file(s) this mod placed. It can't be undone.", len(mod.Files)-shared)
+	if shared > 0 {
+		msg += fmt.Sprintf("\n\n%d file(s) shared with another mod are kept.", shared)
+	}
+	dialog.ShowConfirm("Uninstall "+mod.Name+"?", msg,
 		func(ok bool) {
 			if !ok {
 				return
@@ -252,7 +265,7 @@ func (a *App) uninstallMod(mod *model.Mod) {
 			if err := a.guardGameDir(); err != nil {
 				return
 			}
-			if err := toggler.Uninstall(a.Cfg.GameDir, a.Cfg.GameExeName, mod); err != nil {
+			if err := toggler.Uninstall(a.Cfg.GameDir, a.Cfg.GameExeName, mod, keep); err != nil {
 				a.reportToggleErr(err, mod.Name)
 				return
 			}
@@ -261,6 +274,21 @@ func (a *App) uninstallMod(mod *model.Mod) {
 			a.persist()
 			a.Refresh()
 		}, a.Win)
+}
+
+// pathsClaimedByOthers returns the set of game-relative paths tracked by some
+// mod other than exceptID.
+func (a *App) pathsClaimedByOthers(exceptID string) map[string]bool {
+	out := map[string]bool{}
+	for i := range a.Cfg.Mods {
+		if a.Cfg.Mods[i].ID == exceptID {
+			continue
+		}
+		for _, f := range a.Cfg.Mods[i].Files {
+			out[filepath.ToSlash(f.RelPath)] = true
+		}
+	}
+	return out
 }
 
 // forgetMod drops a mod from the tracked list without touching any files. Use

@@ -106,12 +106,29 @@ func TestUninstallEnabled(t *testing.T) {
 		writeFile(t, filepath.Join(gameDir, filepath.FromSlash(f.RelPath)), "data")
 	}
 
-	if err := Uninstall(gameDir, fakeExe, mod); err != nil {
+	if err := Uninstall(gameDir, fakeExe, mod, nil); err != nil {
 		t.Fatalf("Uninstall: %v", err)
 	}
 	mustNotExist(t, filepath.Join(gameDir, "Sample.asi"))
 	mustNotExist(t, filepath.Join(gameDir, "scripts", "Sample.dll"))
 	mustNotExist(t, filepath.Join(gameDir, "scripts", "sub"))
+}
+
+func TestUninstallKeepsSharedFiles(t *testing.T) {
+	gameNotRunning(t)
+	gameDir := t.TempDir()
+	mod := sampleMod(gameDir)
+	for _, f := range mod.Files {
+		writeFile(t, filepath.Join(gameDir, filepath.FromSlash(f.RelPath)), "data")
+	}
+	// scripts/Sample.dll is also claimed by another mod -> must survive.
+	keep := map[string]bool{"scripts/Sample.dll": true}
+
+	if err := Uninstall(gameDir, fakeExe, mod, keep); err != nil {
+		t.Fatalf("Uninstall: %v", err)
+	}
+	mustNotExist(t, filepath.Join(gameDir, "Sample.asi"))
+	mustExist(t, filepath.Join(gameDir, "scripts", "Sample.dll")) // shared, kept
 }
 
 func TestUninstallDisabled(t *testing.T) {
@@ -124,7 +141,7 @@ func TestUninstallDisabled(t *testing.T) {
 	if err := Disable(gameDir, fakeExe, mod); err != nil {
 		t.Fatal(err)
 	}
-	if err := Uninstall(gameDir, fakeExe, mod); err != nil {
+	if err := Uninstall(gameDir, fakeExe, mod, nil); err != nil {
 		t.Fatalf("Uninstall (disabled): %v", err)
 	}
 	mustNotExist(t, filepath.Join(gameDir, disabledFolderName, "Sample Mod"))

@@ -72,7 +72,12 @@ func Enable(gameDir, gameExeName string, mod *model.Mod) error {
 // "Disabled mods/<mod.Name>/"). This is the one operation SPEC.md allows to
 // delete rather than move — the caller must have confirmed with the user, and
 // is responsible for dropping the mod from the registry afterwards.
-func Uninstall(gameDir, gameExeName string, mod *model.Mod) error {
+//
+// keepRelPaths are game-relative paths that another tracked mod also claims:
+// they are left on disk (so uninstalling one of two mods that share a file
+// doesn't break the other) but the caller still drops this mod's registry
+// entry.
+func Uninstall(gameDir, gameExeName string, mod *model.Mod, keepRelPaths map[string]bool) error {
 	if running, err := procguard.IsGameRunning(gameExeName); err != nil {
 		return err
 	} else if running {
@@ -84,6 +89,9 @@ func Uninstall(gameDir, gameExeName string, mod *model.Mod) error {
 		base = filepath.Join(gameDir, disabledFolderName, mod.Name)
 	}
 	for _, f := range mod.Files {
+		if keepRelPaths[filepath.ToSlash(f.RelPath)] {
+			continue // still owned by another mod
+		}
 		p := filepath.Join(base, filepath.FromSlash(f.RelPath))
 		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("toggler: uninstalling %q, removing %q: %w", mod.Name, f.RelPath, err)
