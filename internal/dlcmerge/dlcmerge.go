@@ -27,14 +27,17 @@ var (
 	nameHashRe   = regexp.MustCompile(`<nameHash>\s*([^<\s]+)\s*</nameHash>`)
 )
 
-// Merge writes a combined dlcpack into outDir (the pack's "dlc.rpf" FOLDER,
-// e.g. .../mods/update/x64/dlcpacks/<combined>/dlc.rpf). combined is the pack
-// name/hash (e.g. "addoncars"). carRPFs are paths to the source dlc.rpf files.
-// Returns the vehicle pack names merged.
-func Merge(combined string, carRPFs []string, outDir string) ([]string, error) {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+// Merge builds a combined dlcpack and writes it as a packed RPF7 file at
+// outRPF (e.g. .../mods/update/x64/dlcpacks/<combined>/dlc.rpf). combined is
+// the pack name/hash (e.g. "addoncars"). carRPFs are paths to the source
+// dlc.rpf files. Returns the vehicle pack names merged. The game/OpenRPF mount
+// a dlcpack's dlc.rpf as a file, not a folder, so the staged tree is packed.
+func Merge(combined string, carRPFs []string, outRPF string) ([]string, error) {
+	outDir, err := os.MkdirTemp("", "dlcmerge-*")
+	if err != nil {
 		return nil, err
 	}
+	defer os.RemoveAll(outDir)
 
 	var dataFiles, changeSets []string
 	var changeNames, merged []string
@@ -89,6 +92,13 @@ func Merge(combined string, carRPFs []string, outDir string) ([]string, error) {
 	if err := os.WriteFile(filepath.Join(outDir, "setup2.xml"),
 		[]byte(buildSetupXML(combined, changeNames)), 0o644); err != nil {
 		return nil, err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outRPF), 0o755); err != nil {
+		return nil, err
+	}
+	if err := rpf.Pack(outDir, outRPF); err != nil {
+		return nil, fmt.Errorf("dlcmerge: packing %s: %w", outRPF, err)
 	}
 	return merged, nil
 }
