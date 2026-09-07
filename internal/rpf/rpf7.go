@@ -58,8 +58,9 @@ var resourceVersion = map[string]uint32{
 
 // Archive is a parsed RPF7.
 type Archive struct {
-	data    []byte
-	entries []entry
+	data          []byte
+	entries       []entry
+	recurseNested bool // extractDir: unpack nested .rpf into folders vs write raw
 }
 
 // Open parses the RPF7 at path. Returns an error for encrypted archives.
@@ -149,10 +150,23 @@ func parse(data []byte) (*Archive, error) {
 // unencrypted .rpf entries are recursed into as sub-folders (OpenRPF reads
 // them that way); an encrypted nested .rpf is written out as-is.
 func ExtractTo(rpfPath, destDir string) (fileCount int, err error) {
+	return extract(rpfPath, destDir, true)
+}
+
+// ExtractShallow is like ExtractTo but writes nested .rpf entries as raw files
+// instead of recursing into them — so compiled resources inside those nested
+// archives are never touched (no RSC7 reconstruction). Use this when the nested
+// .rpf can stay packed, e.g. a mod's vehicles.rpf referenced as RPF_FILE.
+func ExtractShallow(rpfPath, destDir string) (fileCount int, err error) {
+	return extract(rpfPath, destDir, false)
+}
+
+func extract(rpfPath, destDir string, recurseNested bool) (int, error) {
 	ar, err := Open(rpfPath)
 	if err != nil {
 		return 0, err
 	}
+	ar.recurseNested = recurseNested
 	return ar.extractDir(0, destDir)
 }
 
@@ -227,9 +241,11 @@ func (ar *Archive) extractDir(idx int, dir string) (int, error) {
 		}
 		outPath := filepath.Join(dir, safeName(child.name))
 
-		// Recurse into an unencrypted nested .rpf so OpenRPF sees loose files.
-		if strings.EqualFold(path.Ext(child.name), ".rpf") {
+		// Recurse into an unencrypted nested .rpf so OpenRPF sees loose files —
+		// unless the caller asked to keep nested archives packed.
+		if ar.recurseNested && strings.EqualFold(path.Ext(child.name), ".rpf") {
 			if sub, perr := parse(raw); perr == nil {
+				sub.recurseNested = true
 				n, serr := sub.extractDir(0, outPath) // outPath becomes a folder named "x.rpf"
 				count += n
 				if serr != nil {
