@@ -39,6 +39,34 @@ multi-month reverse-engineering effort; CodeWalker already did it.
 **Decision pending:** embedded helper (bigger app, GPLv3) vs. optional
 "advanced mode" download (app stays lean).
 
+## Guided setup / install wizard
+
+The app should walk a first-time user through the whole chain, not just place
+files: detect the folder, install ScriptHookV (with `args.txt` +
+`xinput1_4.dll` — GTA V Enhanced needs both or nothing loads), install OpenRPF,
+then for content mods explain the OpenRPF reality (dlclist edits inside
+`update.rpf` need CodeWalker; `.oiv` needs OpenIV desktop with an `OpenIV.asi`
+marker present; NG-encrypted `dlc.rpf` won't load loose). Field notes from a
+real Enhanced install are in `internal/rpf` comments and the memory files.
+
+Known Enhanced/OpenRPF limits found the hard way:
+- Only a handful of extra add-on dlcpacks can be mounted from the loose
+  `mods/update/x64/dlcpacks/` before the game crashes on load
+  (`GtaThread collection size …` then dead). Suspected OpenRPF 0.3 limit;
+  bundling several cars into one dlcpack, or a newer OpenRPF, is the way past
+  it.
+- OpenIV package uninstallers corrupt the OpenFormats `update.rpf`
+  (`ERR_FIL_PACK`). Rebuild `mods/update/update.rpf` from a fresh copy instead
+  of relying on an uninstaller.
+
+## RPF handling in the app
+
+`internal/rpf` reads RPF7 "OpenFormats" archives (`Open`, `ExtractTo`,
+`ReadInner`) — used here to inspect and unpack mod `dlc.rpf` files. It is
+read-only on purpose: an in-place dlclist patcher was tried and abandoned
+(the game rejected the rewritten archive). Encrypted (NG/AES) archives and
+RPF8 stay with CodeWalker/OpenIV — see the "RPF editing bridge" section above.
+
 ## Smaller deferred items
 
 - `.rar` / `.7z` extraction (currently: "extract it first").
